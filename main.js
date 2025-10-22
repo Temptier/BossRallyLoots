@@ -147,8 +147,8 @@ async function loadDashboard() {
   const weekId = getSelectedWeek();
   const weekRef = doc(collection(db, "weeks"), weekId);
   const snap = await getDoc(weekRef);
-
   const container = document.getElementById("dashboard-content");
+
   if (!snap.exists()) {
     container.innerHTML = "<p class='text-gray-500'>No data for this week.</p>";
     return;
@@ -157,6 +157,13 @@ async function loadDashboard() {
   const weekData = snap.data();
   const bosses = weekData.bosses || [];
   const totalEarnings = weekData.totalEarnings || 0;
+
+  // Fetch all members to map IDs → names
+  const memberSnapshot = await getDocs(collection(db, "members"));
+  const memberMap = {};
+  memberSnapshot.forEach(docSnap => {
+    memberMap[docSnap.id] = docSnap.data().name;
+  });
 
   // Count member participation
   const counts = {};
@@ -169,12 +176,16 @@ async function loadDashboard() {
   const totalParticipation = Object.values(counts).reduce((a, b) => a + b, 0);
   const goldPerParticipation = totalParticipation > 0 ? totalEarnings / totalParticipation : 0;
 
-  container.innerHTML = Object.entries(counts).map(([id, count]) =>
-    `<div class='p-2 border-b flex justify-between'>
-       <span>${id}</span>
-       <span>${count} runs (${(count * goldPerParticipation).toFixed(1)} gold)</span>
-     </div>`
-  ).join("") || "<p class='text-gray-500'>No participation yet.</p>";
+  // Display dashboard with real names
+  container.innerHTML = Object.entries(counts).map(([id, count]) => {
+    const name = memberMap[id] || "(Unknown Member)";
+    return `
+      <div class='p-2 border-b flex justify-between'>
+        <span>${name}</span>
+        <span>${count} runs (${(count * goldPerParticipation).toFixed(1)} gold)</span>
+      </div>
+    `;
+  }).join("") || "<p class='text-gray-500'>No participation yet.</p>";
 }
 
 // 🟢 Add member
