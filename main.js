@@ -1,194 +1,137 @@
-// =============================
-// Firebase Configuration
-// =============================
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import {
+  initializeApp
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import {
   getFirestore,
   collection,
-  doc,
   addDoc,
-  setDoc,
   getDocs,
-  getDoc,
-  updateDoc,
+  doc,
   deleteDoc,
-  query,
-  where,
-} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+  updateDoc,
+  onSnapshot,
+  setDoc,
+  getDoc
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
+// =============================
+// Firebase Config
+// =============================
 const firebaseConfig = {
   apiKey: "AIzaSyCi4ldLdVtWAUKb0wyyds2HnbNujjIHmWQ",
   authDomain: "guildrallyloots.firebaseapp.com",
   projectId: "guildrallyloots",
   storageBucket: "guildrallyloots.firebasestorage.app",
   messagingSenderId: "116266984921",
-  appId: "1:116266984921:web:90326a9fed2ee48f79a5c8",
+  appId: "1:116266984921:web:90326a9fed2ee48f79a5c8"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // =============================
-// Helper Functions
+// DOM Elements
 // =============================
-function getWeekRange(date = new Date()) {
-  const monday = new Date(date);
-  monday.setDate(date.getDate() - date.getDay() + 1);
-  monday.setHours(0, 0, 0, 0);
+const weekSelect = document.getElementById("weekSelect");
+const bossSelect = document.getElementById("bossSelect");
+const memberListDiv = document.getElementById("memberList");
+const participationList = document.getElementById("participationList");
+const addParticipationBtn = document.getElementById("addParticipationBtn");
+const addBossBtn = document.getElementById("addBossBtn");
+const addMemberBtn = document.getElementById("addMemberBtn");
+const dashboardDiv = document.getElementById("dashboard");
 
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
-
-  return { monday, sunday };
-}
-
-function formatDateTime(date) {
-  return date.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+// =============================
+// Helper: Format Date
+// =============================
+function formatDate(date) {
+  const options = { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" };
+  return date.toLocaleString("en-US", options).replace(",", "");
 }
 
 // =============================
-// UI Elements
+// Auto-create current week if missing
 // =============================
-const weekSelector = document.getElementById("week-selector");
-const dashboardContent = document.getElementById("dashboard-content");
-const bossParticipantsContent = document.getElementById("boss-participants-content");
-const bossListDiv = document.getElementById("boss-list");
-const memberListDiv = document.getElementById("member-list");
-const addParticipationBtn = document.getElementById("add-participation-btn");
-const deleteWeekBtn = document.getElementById("delete-week-btn");
-const newBossInput = document.getElementById("new-boss-name");
-const addBossBtn = document.getElementById("add-boss-btn");
-const newMemberInput = document.getElementById("new-member-name");
-const addMemberBtn = document.getElementById("add-member-btn");
-const weeklyEarningsInput = document.getElementById("weekly-earnings");
-const saveEarningsBtn = document.getElementById("save-earnings-btn");
+async function ensureCurrentWeek() {
+  const now = new Date();
+  const weekId = `${now.getFullYear()}-W${Math.ceil(now.getDate() / 7)}`;
+  const weekRef = doc(db, "weeks", weekId);
+  const weekSnap = await getDoc(weekRef);
 
-let currentWeekId = null;
+  if (!weekSnap.exists()) {
+    await setDoc(weekRef, {
+      week: weekId,
+      startDate: new Date().toISOString(),
+    });
+  }
+  return weekId;
+}
 
 // =============================
-// Week Functions
+// Load Week Options
 // =============================
 async function loadWeeks() {
   const weeksRef = collection(db, "weeks");
   const snapshot = await getDocs(weeksRef);
-  weekSelector.innerHTML = "";
 
-  const { monday, sunday } = getWeekRange();
-  const currentStart = monday.toISOString();
-  const currentEnd = sunday.toISOString();
-
-  let currentWeekFound = null;
+  weekSelect.innerHTML = "";
+  const currentWeekId = await ensureCurrentWeek();
 
   snapshot.forEach((docSnap) => {
     const data = docSnap.data();
     const option = document.createElement("option");
+    const date = new Date(data.startDate);
     option.value = docSnap.id;
-    option.textContent = `${new Date(data.start).toLocaleDateString()} - ${new Date(
-      data.end
-    ).toLocaleDateString()}`;
-    weekSelector.appendChild(option);
-
-    // Detect current week
-    const start = new Date(data.start);
-    const end = new Date(data.end);
-    const now = new Date();
-    if (now >= start && now <= end) {
-      currentWeekFound = docSnap.id;
-    }
+    option.textContent = `${docSnap.id} (${formatDate(date)})`;
+    if (docSnap.id === currentWeekId) option.selected = true;
+    weekSelect.appendChild(option);
   });
 
-  if (snapshot.empty) {
-    await createCurrentWeek();
-  } else {
-    if (currentWeekFound) {
-      weekSelector.value = currentWeekFound;
-      currentWeekId = currentWeekFound;
-    } else {
-      // Auto-create if not found
-      const newWeek = await createCurrentWeek();
-      weekSelector.value = newWeek;
-      currentWeekId = newWeek;
-    }
-    loadDashboard();
-    loadBossParticipants();
-    loadWeekEarnings();
-  }
+  return currentWeekId;
 }
 
-async function createCurrentWeek() {
-  const { monday, sunday } = getWeekRange();
-  const weeksRef = collection(db, "weeks");
-
-  const newWeek = await addDoc(weeksRef, {
-    start: monday.toISOString(),
-    end: sunday.toISOString(),
-    totalEarnings: 0,
-  });
-  await loadWeeks();
-  return newWeek.id;
-}
-
-weekSelector.addEventListener("change", () => {
-  currentWeekId = weekSelector.value;
-  loadDashboard();
-  loadBossParticipants();
-  loadWeekEarnings();
-});
-
-deleteWeekBtn.addEventListener("click", async () => {
-  if (currentWeekId && confirm("Delete this week and all records?")) {
-    await deleteDoc(doc(db, "weeks", currentWeekId));
-    await loadWeeks();
-  }
-});
-
 // =============================
-// Weekly Earnings
-// =============================
-async function loadWeekEarnings() {
-  if (!currentWeekId) return;
-  const docSnap = await getDoc(doc(db, "weeks", currentWeekId));
-  if (docSnap.exists()) {
-    weeklyEarningsInput.value = docSnap.data().totalEarnings || 0;
-  }
-}
-
-saveEarningsBtn.addEventListener("click", async () => {
-  if (!currentWeekId) return;
-  const amount = parseFloat(weeklyEarningsInput.value) || 0;
-  await updateDoc(doc(db, "weeks", currentWeekId), { totalEarnings: amount });
-  loadDashboard();
-});
-
-// =============================
-// Bosses and Members
+// Load Bosses
 // =============================
 async function loadBosses() {
-  bossListDiv.innerHTML = "";
   const bossesRef = collection(db, "bosses");
   const snapshot = await getDocs(bossesRef);
+  bossSelect.innerHTML = "";
   snapshot.forEach((docSnap) => {
-    const div = document.createElement("div");
-    div.innerHTML = `
-      <label class="flex items-center gap-2">
-        <input type="radio" name="selected-boss" value="${docSnap.id}" />
-        ${docSnap.data().name}
-      </label>`;
-    bossListDiv.appendChild(div);
+    const option = document.createElement("option");
+    option.value = docSnap.id;
+    option.textContent = docSnap.data().name;
+    bossSelect.appendChild(option);
   });
 }
 
+// =============================
+// Load Members (Alphabetical + Deselect All)
+// =============================
 async function loadMembers() {
   memberListDiv.innerHTML = "";
+
   const membersRef = collection(db, "members");
   const snapshot = await getDocs(membersRef);
-  snapshot.forEach((docSnap) => {
+
+  const sorted = snapshot.docs.sort((a, b) =>
+    a.data().name.localeCompare(b.data().name)
+  );
+
+  // Add Deselect All button
+  const deselectBtn = document.createElement("button");
+  deselectBtn.textContent = "Deselect All";
+  deselectBtn.className =
+    "bg-gray-300 text-sm px-2 py-1 rounded mb-2 hover:bg-gray-400";
+  deselectBtn.addEventListener("click", () => {
+    const checkboxes = memberListDiv.querySelectorAll(
+      'input[name="selected-member"]'
+    );
+    checkboxes.forEach((cb) => (cb.checked = false));
+  });
+  memberListDiv.appendChild(deselectBtn);
+
+  sorted.forEach((docSnap) => {
     const div = document.createElement("div");
     div.innerHTML = `
       <label class="flex items-center gap-2">
@@ -199,179 +142,194 @@ async function loadMembers() {
   });
 }
 
-addBossBtn.addEventListener("click", async () => {
-  const name = newBossInput.value.trim();
-  if (!name) return;
-  const bossesRef = collection(db, "bosses");
-  const snapshot = await getDocs(query(bossesRef, where("name", "==", name)));
-  if (snapshot.empty) {
-    await addDoc(bossesRef, { name });
-    newBossInput.value = "";
-    loadBosses();
-  } else alert("Boss already exists!");
-});
-
-addMemberBtn.addEventListener("click", async () => {
-  const name = newMemberInput.value.trim();
-  if (!name) return;
-  const membersRef = collection(db, "members");
-  const snapshot = await getDocs(query(membersRef, where("name", "==", name)));
-  if (snapshot.empty) {
-    await addDoc(membersRef, { name });
-    newMemberInput.value = "";
-    loadMembers();
-  } else alert("Member already exists!");
-});
-
 // =============================
-// Add Participation
+// Add Boss Participation
 // =============================
 addParticipationBtn.addEventListener("click", async () => {
-  if (!currentWeekId) return;
-
-  const selectedBoss = document.querySelector('input[name="selected-boss"]:checked');
-  if (!selectedBoss) return alert("Select a boss first.");
-
+  const bossId = bossSelect.value;
+  const weekId = weekSelect.value;
   const selectedMembers = Array.from(
     document.querySelectorAll('input[name="selected-member"]:checked')
-  ).map((m) => m.value);
-  if (selectedMembers.length === 0) return alert("Select at least one member.");
+  ).map((i) => i.value);
 
-  await addDoc(collection(db, "weeks", currentWeekId, "participations"), {
-    bossId: selectedBoss.value,
+  if (!bossId || !weekId || selectedMembers.length === 0) {
+    alert("Please select boss, week, and members.");
+    return;
+  }
+
+  const participationRef = collection(db, "weeks", weekId, "participations");
+  await addDoc(participationRef, {
+    bossId,
     members: selectedMembers,
     timestamp: new Date().toISOString(),
   });
 
-  loadDashboard();
   loadBossParticipants();
+  loadDashboard();
 });
 
 // =============================
-// Load Dashboard and Participants
+// Add Boss
 // =============================
-async function loadDashboard() {
-  if (!currentWeekId) return;
-  const weekDoc = await getDoc(doc(db, "weeks", currentWeekId));
-  const totalEarnings = weekDoc.exists() ? weekDoc.data().totalEarnings || 0 : 0;
+addBossBtn.addEventListener("click", async () => {
+  const bossName = prompt("Enter Boss Name:");
+  if (!bossName) return;
+  const bossesRef = collection(db, "bosses");
+  await addDoc(bossesRef, { name: bossName });
+  loadBosses();
+});
 
-  const partRef = collection(db, "weeks", currentWeekId, "participations");
-  const snapshot = await getDocs(partRef);
+// =============================
+// Add Member
+// =============================
+addMemberBtn.addEventListener("click", async () => {
+  const memberName = prompt("Enter Member Name:");
+  if (!memberName) return;
 
-  const memberCount = {};
-  for (const docSnap of snapshot.docs) {
-    const data = docSnap.data();
-    data.members.forEach((m) => {
-      memberCount[m] = (memberCount[m] || 0) + 1;
-    });
+  const membersRef = collection(db, "members");
+  const existing = await getDocs(membersRef);
+  const exists = existing.docs.find(
+    (d) => d.data().name.toLowerCase() === memberName.toLowerCase()
+  );
+  if (exists) {
+    alert("Member already exists!");
+    return;
   }
 
-  const membersRef = collection(db, "members");
-  const membersSnapshot = await getDocs(membersRef);
-  const memberMap = {};
-  membersSnapshot.forEach((m) => (memberMap[m.id] = m.data().name));
+  await addDoc(membersRef, { name: memberName });
+  loadMembers();
+});
 
-  const totalParticipations = Object.values(memberCount).reduce((a, b) => a + b, 0);
-  dashboardContent.innerHTML = Object.entries(memberCount)
-    .map(([id, count]) => {
-      const share = totalParticipations ? ((count / totalParticipations) * totalEarnings).toFixed(2) : "0";
-      return `<div class="flex justify-between border-b py-1">
-        <span>${memberMap[id] || "Unknown"}</span>
-        <span>${count} runs (${share}g)</span>
-      </div>`;
-    })
-    .join("");
-}
-
+// =============================
+// Load Boss Participants List
+// =============================
 async function loadBossParticipants() {
-  if (!currentWeekId) return;
-  const partRef = collection(db, "weeks", currentWeekId, "participations");
-  const snapshot = await getDocs(partRef);
+  participationList.innerHTML = "";
+  const weekId = weekSelect.value;
+  const weekRef = collection(db, "weeks", weekId, "participations");
+  const snapshot = await getDocs(weekRef);
 
-  const bossesRef = collection(db, "bosses");
-  const bossesSnap = await getDocs(bossesRef);
+  const bosses = await getDocs(collection(db, "bosses"));
   const bossMap = {};
-  bossesSnap.forEach((b) => (bossMap[b.id] = b.data().name));
+  bosses.forEach((b) => (bossMap[b.id] = b.data().name));
 
-  const membersRef = collection(db, "members");
-  const membersSnap = await getDocs(membersRef);
+  const membersSnap = await getDocs(collection(db, "members"));
   const memberMap = {};
   membersSnap.forEach((m) => (memberMap[m.id] = m.data().name));
 
-  bossParticipantsContent.innerHTML = "";
-
-  for (const docSnap of snapshot.docs) {
+  snapshot.forEach((docSnap) => {
     const data = docSnap.data();
     const div = document.createElement("div");
-    div.className = "border-b py-2";
-
-    const bossName = bossMap[data.bossId] || "Unknown Boss";
-    const time = formatDateTime(new Date(data.timestamp));
-    const names = data.members.map((id) => memberMap[id] || "Unknown").join(", ");
-
+    const date = formatDate(new Date(data.timestamp));
+    const memberNames = data.members.map((id) => memberMap[id]).join(", ");
+    div.className = "border p-2 rounded mb-2 bg-gray-100";
     div.innerHTML = `
-      <div class="flex justify-between items-center">
-        <div>
-          <span class="font-semibold">${bossName}</span> - ${time}<br>
-          <span class="text-sm text-gray-600">${names}</span>
-        </div>
-        <div class="flex gap-2">
-          <button class="edit-btn bg-yellow-400 text-white px-2 py-1 rounded text-xs">Edit</button>
-          <button class="delete-btn bg-red-500 text-white px-2 py-1 rounded text-xs">Delete</button>
-        </div>
+      <p><strong>${bossMap[data.bossId]}</strong> - ${date}</p>
+      <p class="text-sm">Participants: ${memberNames}</p>
+      <div class="flex gap-2 mt-1">
+        <button class="edit-btn bg-blue-500 text-white px-2 py-1 text-xs rounded">Edit</button>
+        <button class="delete-btn bg-red-500 text-white px-2 py-1 text-xs rounded">Delete</button>
       </div>
     `;
 
-    div.querySelector(".delete-btn").addEventListener("click", async () => {
-      if (confirm("Delete this participation?")) {
-        await deleteDoc(doc(db, "weeks", currentWeekId, "participations", docSnap.id));
-        loadDashboard();
-        loadBossParticipants();
-      }
-    });
-
+    // Edit Participants
     div.querySelector(".edit-btn").addEventListener("click", async () => {
       const editDiv = document.createElement("div");
       editDiv.className = "mt-2 border-t pt-2";
       editDiv.innerHTML = `<p class="font-semibold mb-1">Edit Participants:</p>`;
 
-      const checkList = membersSnap.docs
+      const sortedMembers = membersSnap.docs.sort((a, b) =>
+        a.data().name.localeCompare(b.data().name)
+      );
+
+      const checkList = sortedMembers
         .map((m) => {
           const checked = data.members.includes(m.id) ? "checked" : "";
           return `
-          <label class="flex items-center gap-2 text-sm">
-            <input type="checkbox" value="${m.id}" ${checked}>
-            ${m.data().name}
-          </label>`;
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" value="${m.id}" ${checked}>
+              ${m.data().name}
+            </label>`;
         })
         .join("");
 
       editDiv.innerHTML += checkList;
+
       const saveBtn = document.createElement("button");
       saveBtn.textContent = "Save Changes";
-      saveBtn.className = "bg-blue-600 text-white px-2 py-1 rounded text-xs mt-2";
+      saveBtn.className =
+        "bg-blue-600 text-white px-2 py-1 rounded text-xs mt-2";
       editDiv.appendChild(saveBtn);
+
       div.appendChild(editDiv);
 
       saveBtn.addEventListener("click", async () => {
-        const newMembers = Array.from(editDiv.querySelectorAll("input[type='checkbox']:checked")).map(
-          (i) => i.value
+        const newMembers = Array.from(
+          editDiv.querySelectorAll("input[type='checkbox']:checked")
+        ).map((i) => i.value);
+        await updateDoc(
+          doc(db, "weeks", weekId, "participations", docSnap.id),
+          { members: newMembers }
         );
-        await updateDoc(doc(db, "weeks", currentWeekId, "participations", docSnap.id), {
-          members: newMembers,
-        });
-        loadDashboard();
         loadBossParticipants();
+        loadDashboard();
       });
     });
 
-    bossParticipantsContent.appendChild(div);
-  }
+    // Delete
+    div.querySelector(".delete-btn").addEventListener("click", async () => {
+      await deleteDoc(doc(db, "weeks", weekId, "participations", docSnap.id));
+      loadBossParticipants();
+      loadDashboard();
+    });
+
+    participationList.appendChild(div);
+  });
+}
+
+// =============================
+// Dashboard Summary
+// =============================
+async function loadDashboard() {
+  dashboardDiv.innerHTML = "";
+  const weekId = weekSelect.value;
+  const participationRef = collection(db, "weeks", weekId, "participations");
+  const snapshot = await getDocs(participationRef);
+
+  const membersSnap = await getDocs(collection(db, "members"));
+  const memberMap = {};
+  membersSnap.forEach((m) => (memberMap[m.id] = m.data().name));
+
+  const counts = {};
+  snapshot.forEach((p) => {
+    p.data().members.forEach((id) => {
+      counts[id] = (counts[id] || 0) + 1;
+    });
+  });
+
+  const sorted = Object.entries(counts).sort(
+    (a, b) => b[1] - a[1]
+  );
+
+  sorted.forEach(([id, count]) => {
+    const div = document.createElement("div");
+    div.textContent = `${memberMap[id] || id}: ${count} participation(s)`;
+    dashboardDiv.appendChild(div);
+  });
 }
 
 // =============================
 // Initialize
 // =============================
-loadWeeks();
-loadBosses();
-loadMembers();
+(async function init() {
+  const currentWeekId = await loadWeeks();
+  await loadBosses();
+  await loadMembers();
+  await loadBossParticipants();
+  await loadDashboard();
+
+  weekSelect.addEventListener("change", () => {
+    loadBossParticipants();
+    loadDashboard();
+  });
+})();
