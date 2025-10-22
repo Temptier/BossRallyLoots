@@ -18,9 +18,18 @@
   <div id="member-chips" class="mt-2 flex flex-wrap gap-2"></div>
 </div>
 
-<!-- Boss Panel -->
+<!-- Boss Management Panel -->
+<div id="boss-manager" class="mb-6 p-4 bg-white rounded shadow">
+  <h2 class="text-xl font-semibold mb-2">Global Boss List</h2>
+  <input type="text" id="boss-name-input" placeholder="Boss Name" class="border p-1 rounded">
+  <button id="add-global-boss" class="bg-purple-500 text-white px-3 py-1 rounded">Add Boss</button>
+  <div id="boss-list-chips" class="mt-2 flex flex-wrap gap-2"></div>
+</div>
+
+<!-- Boss Participation Panel -->
 <div id="boss-panel" class="mb-6 p-4 bg-white rounded shadow">
   <h2 class="text-xl font-semibold mb-2">Add Boss Participation</h2>
+  <input type="text" id="boss-name-inline" placeholder="Or type a boss name" class="border p-1 rounded mb-2">
   <div id="boss-chips" class="mb-2 flex flex-wrap gap-2"></div>
   <button id="add-boss" class="bg-green-500 text-white px-3 py-1 rounded">Add Boss</button>
 </div>
