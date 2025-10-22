@@ -1,9 +1,17 @@
-// Firebase setup
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+// ---------------- Firebase Setup ----------------
 import {
-  getFirestore, collection, doc, getDocs, getDoc, setDoc, updateDoc, addDoc,
-  arrayUnion
-} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+  initializeApp
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  addDoc,
+  doc,
+  getDoc,
+  updateDoc,
+  deleteDoc,
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCi4ldLdVtWAUKb0wyyds2HnbNujjIHmWQ",
@@ -11,263 +19,256 @@ const firebaseConfig = {
   projectId: "guildrallyloots",
   storageBucket: "guildrallyloots.firebasestorage.app",
   messagingSenderId: "116266984921",
-  appId: "1:116266984921:web:90326a9fed2ee48f79a5c8"
+  appId: "1:116266984921:web:90326a9fed2ee48f79a5c8",
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// State
-let selectedBossId = null;
-let selectedMemberIds = new Set();
-
-// Helpers
-function getCurrentWeekId() {
-  const now = new Date();
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - now.getDay() + 1);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  return `${monday.getFullYear()}-${monday.getMonth() + 1}-${monday.getDate()}`;
-}
-
+// ---------------- Utilities ----------------
 function getSelectedWeek() {
-  const selector = document.getElementById("week-selector");
-  return selector?.value || getCurrentWeekId();
+  const select = document.getElementById("week-selector");
+  return select.value;
 }
 
-// Ensure week exists
-async function ensureWeekExists(weekId) {
-  const weekRef = doc(collection(db, "weeks"), weekId);
-  const snap = await getDoc(weekRef);
-  if (!snap.exists()) {
-    const monday = new Date();
-    monday.setDate(new Date().getDate() - new Date().getDay() + 1);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    await setDoc(weekRef, {
-      startDate: monday,
-      endDate: sunday,
-      totalEarnings: 0,
-      bosses: [],
-      createdAt: new Date()
-    });
-  }
-}
-
-// 🟢 Load weeks with valid dates
 async function loadWeeks() {
-  const container = document.getElementById("week-selector");
-  container.innerHTML = "";
-
-  const snapshot = await getDocs(collection(db, "weeks"));
-  const weeks = snapshot.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .sort((a, b) => {
-      const aDate = a.startDate?.toDate ? a.startDate.toDate() : new Date(a.startDate);
-      const bDate = b.startDate?.toDate ? b.startDate.toDate() : new Date(b.startDate);
-      return bDate - aDate;
-    });
-
-  weeks.forEach(week => {
-    const option = document.createElement("option");
-    option.value = week.id;
-
-    const start = week.startDate?.toDate ? week.startDate.toDate() : new Date(week.startDate);
-    const end = week.endDate?.toDate ? week.endDate.toDate() : new Date(week.endDate);
-
-    const startStr = !isNaN(start) ? start.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Unknown";
-    const endStr = !isNaN(end) ? end.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Unknown";
-
-    option.textContent = `${startStr} - ${endStr}`;
-    container.appendChild(option);
+  const weekRef = collection(db, "weeks");
+  const snap = await getDocs(weekRef);
+  const select = document.getElementById("week-selector");
+  select.innerHTML = "";
+  snap.forEach((docSnap) => {
+    const week = docSnap.data();
+    const start = new Date(week.start?.seconds * 1000);
+    const end = new Date(week.end?.seconds * 1000);
+    const label = `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
+    const opt = document.createElement("option");
+    opt.value = docSnap.id;
+    opt.textContent = label;
+    select.appendChild(opt);
   });
+}
 
-  // Add current week if missing
-  const currentWeekId = getCurrentWeekId();
-  if (!weeks.some(w => w.id === currentWeekId)) {
-    const monday = new Date();
-    monday.setDate(new Date().getDate() - new Date().getDay() + 1);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    const option = document.createElement("option");
-    option.value = currentWeekId;
-    option.textContent = `${monday.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${sunday.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
-    container.prepend(option);
+// ---------------- Members ----------------
+async function loadMembers() {
+  const membersRef = collection(db, "members");
+  const snap = await getDocs(membersRef);
+  const container = document.getElementById("member-chips");
+  container.innerHTML = "";
+  snap.forEach((docSnap) => {
+    const m = docSnap.data();
+    const div = document.createElement("div");
+    div.className = "member-chip px-2 py-1 m-1 border rounded cursor-pointer";
+    div.textContent = m.name;
+    div.dataset.id = docSnap.id;
+    div.addEventListener("click", () => div.classList.toggle("bg-green-300"));
+    container.appendChild(div);
+  });
+}
+
+// ---------------- Bosses ----------------
+async function loadGlobalBosses() {
+  const bossesRef = collection(db, "bosses");
+  const snap = await getDocs(bossesRef);
+  const container = document.getElementById("boss-chips");
+  container.innerHTML = "";
+  snap.forEach((docSnap) => {
+    const b = docSnap.data();
+    const div = document.createElement("div");
+    div.className = "boss-chip px-2 py-1 m-1 border rounded cursor-pointer";
+    div.textContent = b.name;
+    div.dataset.id = docSnap.id;
+    div.addEventListener("click", () => {
+      document.getElementById("selected-boss").textContent = b.name;
+      document.getElementById("selected-boss").dataset.id = docSnap.id;
+      document.getElementById("boss-float").classList.add("hidden");
+    });
+    container.appendChild(div);
+  });
+}
+
+// ---------------- Add Boss Participation ----------------
+async function addBossParticipation() {
+  const bossId = document.getElementById("selected-boss").dataset.id;
+  const bossName = document.getElementById("selected-boss").textContent;
+  const weekId = getSelectedWeek();
+  const members = Array.from(
+    document.querySelectorAll("#member-chips .bg-green-300")
+  ).map((el) => el.dataset.id);
+
+  if (!bossId || !members.length || !weekId) {
+    alert("Select a boss, members, and week.");
+    return;
   }
 
-  // Select first week
-  if (container.options.length > 0) container.selectedIndex = 0;
-}
+  const weekRef = doc(collection(db, "weeks"), weekId);
+  const weekSnap = await getDoc(weekRef);
+  const weekData = weekSnap.data();
+  const bosses = weekData.bosses || [];
 
-// 🟢 Load members
-async function loadMembers() {
-  const snapshot = await getDocs(collection(db, "members"));
-  const list = document.getElementById("member-chips");
-  list.innerHTML = "";
-  snapshot.forEach(docSnap => {
-    const member = docSnap.data();
-    const chip = document.createElement("button");
-    chip.textContent = member.name;
-    chip.className = "border px-2 py-1 rounded m-1 text-sm hover:bg-gray-200";
-    chip.onclick = () => {
-      if (selectedMemberIds.has(docSnap.id)) {
-        selectedMemberIds.delete(docSnap.id);
-        chip.classList.remove("bg-green-300");
-      } else {
-        selectedMemberIds.add(docSnap.id);
-        chip.classList.add("bg-green-300");
-      }
-    };
-    list.appendChild(chip);
+  bosses.push({
+    id: crypto.randomUUID(),
+    name: bossName,
+    bossId,
+    participants: members,
+    date: new Date(),
   });
+
+  await updateDoc(weekRef, { bosses });
+  alert("Boss participation added!");
+  loadBossParticipants();
+  loadDashboard();
 }
 
-// 🟢 Load bosses
-async function loadBossChips() {
-  const snapshot = await getDocs(collection(db, "bosses"));
-  const list = document.getElementById("boss-chips");
-  list.innerHTML = "";
-  snapshot.forEach(docSnap => {
-    const boss = docSnap.data();
-    const chip = document.createElement("button");
-    chip.textContent = boss.name;
-    chip.className = "border px-2 py-1 rounded m-1 text-sm hover:bg-gray-200";
-    chip.onclick = () => {
-      selectedBossId = docSnap.id;
-      document.getElementById("open-boss-chips").textContent = boss.name;
-      document.getElementById("boss-float").classList.add("hidden");
-    };
-    list.appendChild(chip);
-  });
-}
-
-// 🟢 Dashboard
+// ---------------- Dashboard ----------------
 async function loadDashboard() {
   const weekId = getSelectedWeek();
   const weekRef = doc(collection(db, "weeks"), weekId);
   const snap = await getDoc(weekRef);
-  const container = document.getElementById("dashboard-content");
+  const section = document.getElementById("dashboard");
 
   if (!snap.exists()) {
-    container.innerHTML = "<p class='text-gray-500'>No data for this week.</p>";
+    section.innerHTML = "<p class='text-gray-500'>No data for this week.</p>";
     return;
   }
 
   const weekData = snap.data();
   const bosses = weekData.bosses || [];
-  const totalEarnings = weekData.totalEarnings || 0;
+  section.innerHTML = `<p>Total Records: ${bosses.length}</p>`;
+}
 
-  // Fetch all members to map IDs → names
+// ---------------- Boss Participants Chart ----------------
+async function loadBossParticipants() {
+  const weekId = getSelectedWeek();
+  const weekRef = doc(collection(db, "weeks"), weekId);
+  const snap = await getDoc(weekRef);
+  const section = document.getElementById("boss-participants");
+
+  if (!snap.exists()) {
+    section.innerHTML = "<p class='text-gray-500'>No data for this week.</p>";
+    return;
+  }
+
+  const weekData = snap.data();
+  const bosses = weekData.bosses || [];
+
   const memberSnapshot = await getDocs(collection(db, "members"));
   const memberMap = {};
-  memberSnapshot.forEach(docSnap => {
+  memberSnapshot.forEach((docSnap) => {
     memberMap[docSnap.id] = docSnap.data().name;
   });
 
-  // Count member participation
-  const counts = {};
-  bosses.forEach(b => {
-    b.participants.forEach(p => {
-      counts[p] = (counts[p] || 0) + 1;
-    });
-  });
-
-  const totalParticipation = Object.values(counts).reduce((a, b) => a + b, 0);
-  const goldPerParticipation = totalParticipation > 0 ? totalEarnings / totalParticipation : 0;
-
-  // Display dashboard with real names
-  container.innerHTML = Object.entries(counts).map(([id, count]) => {
-    const name = memberMap[id] || "(Unknown Member)";
-    return `
-      <div class='p-2 border-b flex justify-between'>
-        <span>${name}</span>
-        <span>${count} runs (${(count * goldPerParticipation).toFixed(1)} gold)</span>
-      </div>
-    `;
-  }).join("") || "<p class='text-gray-500'>No participation yet.</p>";
+  section.innerHTML =
+    bosses
+      .map(
+        (entry) => `
+      <div class="p-2 border-b flex justify-between items-start">
+        <div>
+          <div class="font-semibold">${entry.name}</div>
+          <div class="text-sm text-gray-600">${
+            entry.date
+              ? new Date(entry.date.seconds * 1000).toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "(no date)"
+          }</div>
+          <div class="text-sm">${entry.participants
+            .map((id) => memberMap[id] || "(Unknown)")
+            .join(", ")}</div>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="editBossEntry('${entry.id}')" class="text-blue-500">Edit</button>
+          <button onclick="deleteBossEntry('${entry.id}')" class="text-red-500">Delete</button>
+        </div>
+      </div>`
+      )
+      .join("") || "<p class='text-gray-500'>No boss records yet.</p>";
 }
 
-// 🟢 Add member
-document.getElementById("add-member").addEventListener("click", async () => {
-  const name = document.getElementById("member-name").value.trim();
-  if (!name) return alert("Enter member name");
-
-  const existing = await getDocs(collection(db, "members"));
-  const exists = existing.docs.some(d => d.data().name.toLowerCase() === name.toLowerCase());
-  if (exists) return alert("Member already exists!");
-
-  await addDoc(collection(db, "members"), { name });
-  document.getElementById("member-name").value = "";
-  loadMembers();
-});
-
-// 🟢 Add boss
-document.getElementById("add-boss-global").addEventListener("click", async () => {
-  const name = document.getElementById("boss-name").value.trim();
-  if (!name) return alert("Enter boss name");
-
-  const existing = await getDocs(collection(db, "bosses"));
-  const exists = existing.docs.some(d => d.data().name.toLowerCase() === name.toLowerCase());
-  if (exists) return alert("Boss already exists!");
-
-  await addDoc(collection(db, "bosses"), { name });
-  document.getElementById("boss-name").value = "";
-  loadBossChips();
-});
-
-// 🟢 Add participation
-document.getElementById("add-boss").addEventListener("click", async () => {
-  if (!selectedBossId) return alert("Select a boss");
-  if (selectedMemberIds.size === 0) return alert("Select participants");
-
-  const bossDoc = await getDoc(doc(collection(db, "bosses"), selectedBossId));
-  const bossName = bossDoc.data().name;
-
+// ---------------- Edit Boss Entry ----------------
+window.editBossEntry = async function (entryId) {
   const weekId = getSelectedWeek();
-  await ensureWeekExists(weekId);
   const weekRef = doc(collection(db, "weeks"), weekId);
+  const snap = await getDoc(weekRef);
+  const weekData = snap.data();
+  const bosses = weekData.bosses || [];
 
-  await updateDoc(weekRef, {
-    bosses: arrayUnion({
-      name: bossName,
-      participants: Array.from(selectedMemberIds),
-      createdAt: new Date()
-    })
+  const entry = bosses.find((b) => b.id === entryId);
+  if (!entry) return alert("Entry not found");
+
+  // Highlight current participants
+  const memberChips = document.querySelectorAll("#member-chips .member-chip");
+  memberChips.forEach((chip) => {
+    if (entry.participants.includes(chip.dataset.id))
+      chip.classList.add("bg-green-300");
+    else chip.classList.remove("bg-green-300");
   });
 
-  selectedBossId = null;
-  selectedMemberIds.clear();
-  document.getElementById("open-boss-chips").textContent = "Select Boss";
-  document.getElementById("open-member-chips").textContent = "Select Members";
+  document.getElementById("selected-boss").textContent = entry.name;
+  document.getElementById("selected-boss").dataset.id = entry.bossId;
+  document.getElementById("edit-entry-id").value = entryId;
+  alert("Edit mode: now update participants and press Save Changes.");
+};
 
-  loadDashboard();
-});
+// ---------------- Save Edit ----------------
+async function saveEditedBossEntry() {
+  const entryId = document.getElementById("edit-entry-id").value;
+  if (!entryId) return addBossParticipation();
 
-// 🟢 Update earnings
-document.getElementById("update-earnings").addEventListener("click", async () => {
-  const earnings = Number(document.getElementById("total-earnings").value);
-  if (isNaN(earnings)) return alert("Enter valid number");
   const weekId = getSelectedWeek();
-  await ensureWeekExists(weekId);
   const weekRef = doc(collection(db, "weeks"), weekId);
-  await updateDoc(weekRef, { totalEarnings: earnings });
+  const weekSnap = await getDoc(weekRef);
+  const weekData = weekSnap.data();
+  const bosses = weekData.bosses || [];
+
+  const members = Array.from(
+    document.querySelectorAll("#member-chips .bg-green-300")
+  ).map((el) => el.dataset.id);
+
+  const updated = bosses.map((b) =>
+    b.id === entryId ? { ...b, participants: members } : b
+  );
+
+  await updateDoc(weekRef, { bosses: updated });
+  alert("Boss entry updated!");
+  document.getElementById("edit-entry-id").value = "";
+  loadBossParticipants();
   loadDashboard();
+}
+
+// ---------------- Delete Boss Entry ----------------
+window.deleteBossEntry = async function (entryId) {
+  const weekId = getSelectedWeek();
+  const weekRef = doc(collection(db, "weeks"), weekId);
+  const snap = await getDoc(weekRef);
+  const weekData = snap.data();
+  const bosses = weekData.bosses || [];
+
+  const updated = bosses.filter((b) => b.id !== entryId);
+  await updateDoc(weekRef, { bosses: updated });
+  alert("Entry deleted!");
+  loadBossParticipants();
+  loadDashboard();
+};
+
+// ---------------- Init ----------------
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadWeeks();
+  await loadMembers();
+  await loadGlobalBosses();
+  await loadDashboard();
+  await loadBossParticipants();
+
+  document
+    .getElementById("week-selector")
+    .addEventListener("change", () => {
+      loadDashboard();
+      loadBossParticipants();
+    });
+
+  document
+    .getElementById("add-boss-btn")
+    .addEventListener("click", saveEditedBossEntry);
 });
-
-// 🟢 Floating chips toggle
-document.getElementById("open-boss-chips").onclick = () => {
-  document.getElementById("boss-float").classList.toggle("hidden");
-};
-document.getElementById("open-member-chips").onclick = () => {
-  document.getElementById("member-float").classList.toggle("hidden");
-};
-
-// 🟢 Week selector auto-refresh
-document.getElementById("week-selector").addEventListener("change", loadDashboard);
-
-// Init
-await loadWeeks();
-await loadMembers();
-await loadBossChips();
-await loadDashboard();
