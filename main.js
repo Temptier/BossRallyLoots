@@ -1,9 +1,9 @@
-import { db, collection, doc, setDoc, updateDoc, getDoc, arrayUnion, getDocs, deleteDoc } from './firebase.js';
+import { db, collection, doc, setDoc, updateDoc, getDoc, getDocs, arrayUnion, deleteDoc } from './firebase.js';
 
 let selectedMemberIds = new Set();
 let selectedBossId = null;
 
-// --- Week Helper ---
+// --- Helper: Current week ---
 const getCurrentWeekId = () => {
   const today = new Date();
   const monday = new Date(today);
@@ -11,23 +11,65 @@ const getCurrentWeekId = () => {
   return `week-${monday.toISOString().slice(0,10)}`;
 };
 
-async function ensureCurrentWeek() {
-  const weekId = getCurrentWeekId();
+// --- Ensure week exists ---
+async function ensureWeekExists(weekId) {
   const weekRef = doc(collection(db, "weeks"), weekId);
   const snap = await getDoc(weekRef);
   if (!snap.exists()) {
+    const monday = new Date();
+    monday.setDate(new Date().getDate() - new Date().getDay() + 1);
+    const sunday = new Date();
+    sunday.setDate(monday.getDate() + 6);
     await setDoc(weekRef, {
-      startDate: new Date(),
-      endDate: new Date(new Date().setDate(new Date().getDate() + 6)),
+      startDate: monday,
+      endDate: sunday,
       totalEarnings: 0,
       bosses: [],
       createdAt: new Date()
     });
   }
-  return weekId;
 }
 
-// --- Load Members into floating chip list ---
+// --- Load weeks into dropdown ---
+async function loadWeeks() {
+  const container = document.getElementById("week-selector");
+  container.innerHTML = "";
+
+  const snapshot = await getDocs(collection(db, "weeks"));
+  const weeks = snapshot.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => new Date(b.startDate) - new Date(a.startDate));
+
+  weeks.forEach(week => {
+    const option = document.createElement("option");
+    option.value = week.id;
+    const start = new Date(week.startDate).toLocaleDateString();
+    const end = new Date(week.endDate).toLocaleDateString();
+    option.textContent = `${start} - ${end}`;
+    container.appendChild(option);
+  });
+
+  // Add current week if missing
+  const currentWeekId = getCurrentWeekId();
+  if (!weeks.some(w => w.id === currentWeekId)) {
+    const option = document.createElement("option");
+    option.value = currentWeekId;
+    const monday = new Date();
+    monday.setDate(new Date().getDate() - new Date().getDay() + 1);
+    const sunday = new Date();
+    sunday.setDate(monday.getDate() + 6);
+    option.textContent = `${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()}`;
+    container.prepend(option);
+  }
+}
+
+// --- Get selected week ---
+function getSelectedWeek() {
+  const selector = document.getElementById("week-selector");
+  return selector.value || getCurrentWeekId();
+}
+
+// --- Load Members into floating chips ---
 async function loadMembers() {
   const container = document.getElementById("member-chips");
   container.innerHTML = "";
@@ -55,12 +97,7 @@ async function loadMembers() {
   });
 }
 
-// Toggle member chips
-document.getElementById("open-member-chips").addEventListener("click", () => {
-  document.getElementById("member-chips").classList.toggle("hidden");
-});
-
-// --- Load Boss Chips for floating selector ---
+// --- Load Boss Chips ---
 async function loadBossChips() {
   const container = document.getElementById("boss-chips");
   container.innerHTML = "";
@@ -80,7 +117,10 @@ async function loadBossChips() {
   });
 }
 
-// Toggle boss chips
+// --- Toggle chip lists ---
+document.getElementById("open-member-chips").addEventListener("click", () => {
+  document.getElementById("member-chips").classList.toggle("hidden");
+});
 document.getElementById("open-boss-chips").addEventListener("click", () => {
   document.getElementById("boss-chips").classList.toggle("hidden");
 });
@@ -93,9 +133,10 @@ document.getElementById("add-boss").addEventListener("click", async () => {
   const bossDoc = await getDoc(doc(collection(db,"bosses"), selectedBossId));
   const bossName = bossDoc.data().name;
 
-  const weekId = await ensureCurrentWeek();
-  const weekRef = doc(collection(db, "weeks"), weekId);
+  const weekId = getSelectedWeek();
+  await ensureWeekExists(weekId);
 
+  const weekRef = doc(collection(db, "weeks"), weekId);
   await updateDoc(weekRef, {
     bosses: arrayUnion({
       name: bossName,
@@ -149,7 +190,9 @@ document.getElementById("update-earnings").addEventListener("click", async () =>
   const earnings = Number(document.getElementById("total-earnings").value);
   if (isNaN(earnings)) return alert("Enter valid number");
 
-  const weekId = await ensureCurrentWeek();
+  const weekId = getSelectedWeek();
+  await ensureWeekExists(weekId);
+
   const weekRef = doc(collection(db,"weeks"), weekId);
   await updateDoc(weekRef, { totalEarnings: earnings });
   loadDashboard();
@@ -168,31 +211,36 @@ async function loadGlobalBosses() {
   });
 }
 
-// --- Dashboard ---
+// --- Load Dashboard ---
 async function loadDashboard() {
-  const weekId = await ensureCurrentWeek();
+  const weekId = getSelectedWeek();
   const weekRef = doc(collection(db,"weeks"), weekId);
   const snap = await getDoc(weekRef);
-  if (!snap.exists()) return;
+  const dash = document.getElementById("dashboard-content");
+  dash.innerHTML = "";
+
+  if (!snap.exists()) {
+    dash.innerHTML = "<p class='text-gray-500'>No data for this week.</p>";
+    return;
+  }
 
   const weekData = snap.data();
   const bosses = weekData.bosses || [];
   const totalEarnings = weekData.totalEarnings || 0;
 
   const participationCount = {};
-  bosses.forEach(b => b.participants.forEach(id => {
-    if (!participationCount[id]) participationCount[id] = [];
-    participationCount[id].push(b.name);
-  }));
+  for (const b of bosses) {
+    b.participants.forEach(id => {
+      if (!participationCount[id]) participationCount[id] = [];
+      participationCount[id].push(b.name);
+    });
+  }
 
   const totalParticipations = Object.values(participationCount).reduce((sum, arr) => sum + arr.length, 0) || 1;
   const earnings = {};
   for (const [id, bossArray] of Object.entries(participationCount)) {
     earnings[id] = Math.floor((bossArray.length / totalParticipations) * totalEarnings);
   }
-
-  const dash = document.getElementById("dashboard-content");
-  dash.innerHTML = "";
 
   for (const [memberId, bossArray] of Object.entries(participationCount)) {
     const memberDoc = await getDoc(doc(collection(db,"members"), memberId));
@@ -203,7 +251,6 @@ async function loadDashboard() {
     const div = document.createElement("div");
     div.className = "p-2 bg-gray-100 rounded shadow mb-1";
     div.textContent = `${name} – Participations: ${participations} – Bosses: ${bossesJoined} – Earnings: ${earnings[memberId]} gold`;
-
     dash.appendChild(div);
   }
 }
@@ -211,12 +258,19 @@ async function loadDashboard() {
 // --- Delete Week ---
 document.getElementById("delete-week").addEventListener("click", async () => {
   if (!confirm("Delete current week?")) return;
-  const weekId = await ensureCurrentWeek();
+  const weekId = getSelectedWeek();
   await deleteDoc(doc(collection(db,"weeks"), weekId));
+  loadDashboard();
+  loadWeeks();
+});
+
+// --- Update dashboard when week changes ---
+document.getElementById("week-selector").addEventListener("change", () => {
   loadDashboard();
 });
 
 // --- Initial Load ---
+await loadWeeks();
 loadMembers();
 loadGlobalBosses();
 loadBossChips();
