@@ -7,7 +7,6 @@ import {
   collection,
   doc,
   addDoc,
-  setDoc,
   getDocs,
   getDoc,
   updateDoc,
@@ -35,11 +34,9 @@ function getWeekRange(date = new Date()) {
   const monday = new Date(date);
   monday.setDate(date.getDate() - date.getDay() + 1);
   monday.setHours(0, 0, 0, 0);
-
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
   sunday.setHours(23, 59, 59, 999);
-
   return { monday, sunday };
 }
 
@@ -68,6 +65,7 @@ const newMemberInput = document.getElementById("new-member-name");
 const addMemberBtn = document.getElementById("add-member-btn");
 const weeklyEarningsInput = document.getElementById("weekly-earnings");
 const saveEarningsBtn = document.getElementById("save-earnings-btn");
+const deselectAllBtn = document.getElementById("deselect-all-btn");
 
 let currentWeekId = null;
 
@@ -80,9 +78,7 @@ async function loadWeeks() {
   weekSelector.innerHTML = "";
 
   const { monday, sunday } = getWeekRange();
-  const currentStart = monday.toISOString();
-  const currentEnd = sunday.toISOString();
-
+  const now = new Date();
   let currentWeekFound = null;
 
   snapshot.forEach((docSnap) => {
@@ -94,10 +90,8 @@ async function loadWeeks() {
     ).toLocaleDateString()}`;
     weekSelector.appendChild(option);
 
-    // Detect current week
     const start = new Date(data.start);
     const end = new Date(data.end);
-    const now = new Date();
     if (now >= start && now <= end) {
       currentWeekFound = docSnap.id;
     }
@@ -110,7 +104,6 @@ async function loadWeeks() {
       weekSelector.value = currentWeekFound;
       currentWeekId = currentWeekFound;
     } else {
-      // Auto-create if not found
       const newWeek = await createCurrentWeek();
       weekSelector.value = newWeek;
       currentWeekId = newWeek;
@@ -124,7 +117,6 @@ async function loadWeeks() {
 async function createCurrentWeek() {
   const { monday, sunday } = getWeekRange();
   const weeksRef = collection(db, "weeks");
-
   const newWeek = await addDoc(weeksRef, {
     start: monday.toISOString(),
     end: sunday.toISOString(),
@@ -167,7 +159,7 @@ saveEarningsBtn.addEventListener("click", async () => {
 });
 
 // =============================
-// Bosses and Members
+// Bosses Functions
 // =============================
 async function loadBosses() {
   bossListDiv.innerHTML = "";
@@ -184,21 +176,6 @@ async function loadBosses() {
   });
 }
 
-async function loadMembers() {
-  memberListDiv.innerHTML = "";
-  const membersRef = collection(db, "members");
-  const snapshot = await getDocs(membersRef);
-  snapshot.forEach((docSnap) => {
-    const div = document.createElement("div");
-    div.innerHTML = `
-      <label class="flex items-center gap-2">
-        <input type="checkbox" name="selected-member" value="${docSnap.id}" />
-        ${docSnap.data().name}
-      </label>`;
-    memberListDiv.appendChild(div);
-  });
-}
-
 addBossBtn.addEventListener("click", async () => {
   const name = newBossInput.value.trim();
   if (!name) return;
@@ -210,6 +187,28 @@ addBossBtn.addEventListener("click", async () => {
     loadBosses();
   } else alert("Boss already exists!");
 });
+
+// =============================
+// Members Functions (Alphabetical + Deselect All)
+// =============================
+async function loadMembers() {
+  memberListDiv.innerHTML = "";
+  const membersRef = collection(db, "members");
+  const snapshot = await getDocs(membersRef);
+
+  const membersArray = snapshot.docs.map((m) => ({ id: m.id, name: m.data().name }));
+  membersArray.sort((a, b) => a.name.localeCompare(b.name));
+
+  membersArray.forEach((m) => {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <label class="flex items-center gap-2">
+        <input type="checkbox" name="selected-member" value="${m.id}" />
+        ${m.name}
+      </label>`;
+    memberListDiv.appendChild(div);
+  });
+}
 
 addMemberBtn.addEventListener("click", async () => {
   const name = newMemberInput.value.trim();
@@ -223,6 +222,11 @@ addMemberBtn.addEventListener("click", async () => {
   } else alert("Member already exists!");
 });
 
+// Deselect all members
+deselectAllBtn.addEventListener("click", () => {
+  const checkboxes = memberListDiv.querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach((c) => (c.checked = false));
+});
 // =============================
 // Add Participation
 // =============================
@@ -235,6 +239,7 @@ addParticipationBtn.addEventListener("click", async () => {
   const selectedMembers = Array.from(
     document.querySelectorAll('input[name="selected-member"]:checked')
   ).map((m) => m.value);
+
   if (selectedMembers.length === 0) return alert("Select at least one member.");
 
   await addDoc(collection(db, "weeks", currentWeekId, "participations"), {
@@ -248,10 +253,11 @@ addParticipationBtn.addEventListener("click", async () => {
 });
 
 // =============================
-// Load Dashboard and Participants
+// Load Dashboard
 // =============================
 async function loadDashboard() {
   if (!currentWeekId) return;
+
   const weekDoc = await getDoc(doc(db, "weeks", currentWeekId));
   const totalEarnings = weekDoc.exists() ? weekDoc.data().totalEarnings || 0 : 0;
 
@@ -283,6 +289,9 @@ async function loadDashboard() {
     .join("");
 }
 
+// =============================
+// Load Boss Participants List
+// =============================
 async function loadBossParticipants() {
   if (!currentWeekId) return;
   const partRef = collection(db, "weeks", currentWeekId, "participations");
@@ -322,6 +331,7 @@ async function loadBossParticipants() {
       </div>
     `;
 
+    // Delete participation
     div.querySelector(".delete-btn").addEventListener("click", async () => {
       if (confirm("Delete this participation?")) {
         await deleteDoc(doc(db, "weeks", currentWeekId, "participations", docSnap.id));
@@ -330,6 +340,7 @@ async function loadBossParticipants() {
       }
     });
 
+    // Edit participation
     div.querySelector(".edit-btn").addEventListener("click", async () => {
       const editDiv = document.createElement("div");
       editDiv.className = "mt-2 border-t pt-2";
@@ -370,7 +381,7 @@ async function loadBossParticipants() {
 }
 
 // =============================
-// Initialize
+// Initialize App
 // =============================
 loadWeeks();
 loadBosses();
