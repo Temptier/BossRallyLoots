@@ -48,7 +48,6 @@ async function loadWeeks() {
     container.appendChild(option);
   });
 
-  // Add current week if missing
   const currentWeekId = getCurrentWeekId();
   if (!weeks.some(w => w.id === currentWeekId)) {
     const option = document.createElement("option");
@@ -187,4 +186,97 @@ document.getElementById("add-global-boss").addEventListener("click", async () =>
   const bossRef = doc(collection(db,"bosses"));
   await setDoc(bossRef, { name, createdAt: new Date() });
   document.getElementById("boss-name-input").value = "";
-  loadGlobal
+  loadGlobalBosses();
+  loadBossChips();
+});
+
+// --- Update Total Earnings ---
+document.getElementById("update-earnings").addEventListener("click", async () => {
+  const earnings = Number(document.getElementById("total-earnings").value);
+  if (isNaN(earnings)) return alert("Enter valid number");
+
+  const weekId = getSelectedWeek();
+  await ensureWeekExists(weekId);
+
+  const weekRef = doc(collection(db,"weeks"), weekId);
+  await updateDoc(weekRef, { totalEarnings: earnings });
+  loadDashboard();
+});
+
+// --- Load Global Bosses ---
+async function loadGlobalBosses() {
+  const container = document.getElementById("boss-list-chips");
+  container.innerHTML = "";
+  const snapshot = await getDocs(collection(db, "bosses"));
+  snapshot.forEach(docSnap => {
+    const chip = document.createElement("div");
+    chip.textContent = docSnap.data().name;
+    chip.className = "px-3 py-1 rounded-full bg-purple-200 text-purple-800 cursor-pointer hover:scale-105 transition transform";
+    container.appendChild(chip);
+  });
+}
+
+// --- Load Dashboard ---
+async function loadDashboard() {
+  const weekId = getSelectedWeek();
+  const weekRef = doc(collection(db,"weeks"), weekId);
+  const snap = await getDoc(weekRef);
+  const dash = document.getElementById("dashboard-content");
+  dash.innerHTML = "";
+
+  if (!snap.exists()) {
+    dash.innerHTML = "<p class='text-gray-500'>No data for this week.</p>";
+    return;
+  }
+
+  const weekData = snap.data();
+  const bosses = weekData.bosses || [];
+  const totalEarnings = weekData.totalEarnings || 0;
+
+  const participationCount = {};
+  for (const b of bosses) {
+    b.participants.forEach(id => {
+      if (!participationCount[id]) participationCount[id] = [];
+      participationCount[id].push(b.name);
+    });
+  }
+
+  const totalParticipations = Object.values(participationCount).reduce((sum, arr) => sum + arr.length, 0) || 1;
+  const earnings = {};
+  for (const [id, bossArray] of Object.entries(participationCount)) {
+    earnings[id] = Math.floor((bossArray.length / totalParticipations) * totalEarnings);
+  }
+
+  for (const [memberId, bossArray] of Object.entries(participationCount)) {
+    const memberDoc = await getDoc(doc(collection(db,"members"), memberId));
+    const name = memberDoc.exists() ? memberDoc.data().name : "Unknown";
+    const participations = bossArray.length;
+    const bossesJoined = bossArray.join(", ");
+
+    const div = document.createElement("div");
+    div.className = "p-2 bg-gray-100 rounded shadow mb-1";
+    div.textContent = `${name} – Participations: ${participations} – Bosses: ${bossesJoined} – Earnings: ${earnings[memberId]} gold`;
+    dash.appendChild(div);
+  }
+}
+
+// --- Delete Week ---
+document.getElementById("delete-week").addEventListener("click", async () => {
+  if (!confirm("Delete current week?")) return;
+  const weekId = getSelectedWeek();
+  await deleteDoc(doc(collection(db,"weeks"), weekId));
+  loadDashboard();
+  loadWeeks();
+});
+
+// --- Update dashboard when week changes ---
+document.getElementById("week-selector").addEventListener("change", () => {
+  loadDashboard();
+});
+
+// --- Initial Load ---
+await loadWeeks();
+loadMembers();
+loadGlobalBosses();
+loadBossChips();
+loadDashboard();
