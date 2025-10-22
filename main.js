@@ -3,7 +3,7 @@ import { db, collection, doc, setDoc, updateDoc, getDoc, getDocs, arrayUnion, de
 let selectedMemberIds = new Set();
 let selectedBossId = null;
 
-// --- Current Week ---
+// --- Helper: Current week ---
 const getCurrentWeekId = () => {
   const today = new Date();
   const monday = new Date(today);
@@ -30,14 +30,15 @@ async function ensureWeekExists(weekId) {
   }
 }
 
-// --- Load Weeks ---
+// --- Load weeks into dropdown ---
 async function loadWeeks() {
   const container = document.getElementById("week-selector");
   container.innerHTML = "";
 
   const snapshot = await getDocs(collection(db, "weeks"));
-  const weeks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
-                             .sort((a,b) => new Date(b.startDate) - new Date(a.startDate));
+  const weeks = snapshot.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => new Date(b.startDate) - new Date(a.startDate));
 
   weeks.forEach(week => {
     const option = document.createElement("option");
@@ -48,6 +49,7 @@ async function loadWeeks() {
     container.appendChild(option);
   });
 
+  // Add current week if missing
   const currentWeekId = getCurrentWeekId();
   if (!weeks.some(w => w.id === currentWeekId)) {
     const option = document.createElement("option");
@@ -61,13 +63,13 @@ async function loadWeeks() {
   }
 }
 
-// --- Selected Week ---
+// --- Get selected week ---
 function getSelectedWeek() {
   const selector = document.getElementById("week-selector");
   return selector.value || getCurrentWeekId();
 }
 
-// --- Load Members ---
+// --- Load Members into floating chips ---
 async function loadMembers() {
   const container = document.getElementById("member-chips");
   container.innerHTML = "";
@@ -86,6 +88,7 @@ async function loadMembers() {
         selectedMemberIds.add(docSnap.id);
         chip.className = "px-3 py-1 rounded-full bg-blue-500 text-white cursor-pointer hover:scale-105 transition transform";
       }
+
       const btn = document.getElementById("open-member-chips");
       btn.textContent = selectedMemberIds.size === 0 ? "Select Members" : `Selected: ${selectedMemberIds.size}`;
     });
@@ -107,34 +110,20 @@ async function loadBossChips() {
     chip.addEventListener("click", () => {
       selectedBossId = docSnap.id;
       document.getElementById("open-boss-chips").textContent = docSnap.data().name;
-      closePanels();
+      container.classList.add("hidden");
     });
 
     container.appendChild(chip);
   });
 }
 
-// --- Panels & Overlay ---
-const bossPanel = document.getElementById("boss-chips-panel");
-const memberPanel = document.getElementById("member-chips-panel");
-const overlay = document.getElementById("overlay");
-
-function openPanel(panel) {
-  panel.classList.remove("translate-y-full");
-  overlay.classList.add("visible"); // enable clicks
-  overlay.classList.remove("hidden");
-}
-
-function closePanels() {
-  bossPanel.classList.add("translate-y-full");
-  memberPanel.classList.add("translate-y-full");
-  overlay.classList.remove("visible"); // disable clicks
-  overlay.classList.add("hidden");
-}
-
-document.getElementById("open-boss-chips").addEventListener("click", () => openPanel(bossPanel));
-document.getElementById("open-member-chips").addEventListener("click", () => openPanel(memberPanel));
-overlay.addEventListener("click", closePanels);
+// --- Toggle chip lists ---
+document.getElementById("open-member-chips").addEventListener("click", () => {
+  document.getElementById("member-chips").classList.toggle("hidden");
+});
+document.getElementById("open-boss-chips").addEventListener("click", () => {
+  document.getElementById("boss-chips").classList.toggle("hidden");
+});
 
 // --- Add Boss Participation ---
 document.getElementById("add-boss").addEventListener("click", async () => {
@@ -149,7 +138,11 @@ document.getElementById("add-boss").addEventListener("click", async () => {
 
   const weekRef = doc(collection(db, "weeks"), weekId);
   await updateDoc(weekRef, {
-    bosses: arrayUnion({ name: bossName, participants: Array.from(selectedMemberIds), createdAt: new Date() })
+    bosses: arrayUnion({
+      name: bossName,
+      participants: Array.from(selectedMemberIds),
+      createdAt: new Date()
+    })
   });
 
   selectedMemberIds.clear();
