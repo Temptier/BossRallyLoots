@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Guild Boss Tracker</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Overlay pointer fix */
+    #overlay {
+      pointer-events: none; /* default: ignore clicks */
+    }
+    #overlay.visible {
+      pointer-events: auto; /* only capture clicks when visible */
+    }
+  </style>
 </head>
 <body class="bg-gray-50 p-4">
 
@@ -15,8 +24,8 @@
   <div id="boss-panel" class="mb-6 p-4 bg-white rounded shadow w-full sm:w-3/4 mx-auto">
     <h2 class="text-xl font-semibold mb-2 text-green-600">Add Boss Participation</h2>
 
-    <button id="open-boss-chips" class="w-full p-2 border rounded mb-2 text-left bg-gray-100">Select Boss</button>
-    <button id="open-member-chips" class="w-full p-2 border rounded mb-2 text-left bg-gray-100">Select Members</button>
+    <button id="open-boss-chips" class="z-50 w-full p-2 border rounded mb-2 text-left bg-gray-100">Select Boss</button>
+    <button id="open-member-chips" class="z-50 w-full p-2 border rounded mb-2 text-left bg-gray-100">Select Members</button>
 
     <button id="add-boss" class="bg-green-500 text-white px-3 py-2 rounded w-full sm:w-auto">Add Boss Participation</button>
   </div>
@@ -25,7 +34,6 @@
   <div class="mb-6 p-4 bg-white rounded shadow w-full sm:w-3/4 mx-auto">
     <h2 class="text-xl font-semibold mb-2 text-yellow-600">Update Weekly Earnings</h2>
 
-    <!-- Week Selector -->
     <select id="week-selector" class="border p-2 rounded mb-2 w-full"></select>
 
     <input type="number" id="total-earnings" placeholder="Enter total gold earned" class="border p-2 rounded mb-2 w-full">
