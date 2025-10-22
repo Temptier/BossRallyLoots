@@ -27,7 +27,7 @@ async function ensureCurrentWeek() {
   return weekId;
 }
 
-// --- Members ---
+// --- Load Members into floating chip list ---
 async function loadMembers() {
   const container = document.getElementById("member-chips");
   container.innerHTML = "";
@@ -46,55 +46,21 @@ async function loadMembers() {
         selectedMemberIds.add(docSnap.id);
         chip.className = "px-3 py-1 rounded-full bg-blue-500 text-white cursor-pointer hover:scale-105 transition transform";
       }
+
+      const btn = document.getElementById("open-member-chips");
+      btn.textContent = selectedMemberIds.size === 0 ? "Select Members" : `Selected: ${selectedMemberIds.size}`;
     });
+
     container.appendChild(chip);
   });
 }
 
-document.getElementById("add-member").addEventListener("click", async () => {
-  const name = document.getElementById("member-name").value.trim();
-  if (!name) return alert("Enter a member name");
-
-  const snapshot = await getDocs(collection(db, "members"));
-  const exists = snapshot.docs.some(d => d.data().name.toLowerCase() === name.toLowerCase());
-  if (exists) return alert("Member already exists!");
-
-  const memberRef = doc(collection(db, "members"));
-  await setDoc(memberRef, { name, createdAt: new Date() });
-  document.getElementById("member-name").value = "";
-  document.getElementById("member-name").focus();
-  loadMembers();
+// Toggle member chips
+document.getElementById("open-member-chips").addEventListener("click", () => {
+  document.getElementById("member-chips").classList.toggle("hidden");
 });
 
-// --- Global Bosses ---
-async function loadGlobalBosses() {
-  const container = document.getElementById("boss-list-chips");
-  container.innerHTML = "";
-  const snapshot = await getDocs(collection(db, "bosses"));
-  snapshot.forEach(docSnap => {
-    const chip = document.createElement("div");
-    chip.textContent = docSnap.data().name;
-    chip.className = "px-3 py-1 rounded-full bg-purple-200 text-purple-800 cursor-pointer hover:scale-105 transition transform";
-    container.appendChild(chip);
-  });
-}
-
-document.getElementById("add-global-boss").addEventListener("click", async () => {
-  const name = document.getElementById("boss-name-input").value.trim();
-  if (!name) return alert("Enter boss name");
-
-  const snapshot = await getDocs(collection(db,"bosses"));
-  const exists = snapshot.docs.some(d => d.data().name.toLowerCase() === name.toLowerCase());
-  if (exists) return alert("Boss already exists!");
-
-  const bossRef = doc(collection(db,"bosses"));
-  await setDoc(bossRef, { name, createdAt: new Date() });
-  document.getElementById("boss-name-input").value = "";
-  document.getElementById("boss-name-input").focus();
-  loadGlobalBosses();
-});
-
-// --- Boss Chips for Weekly Participation (Floating) ---
+// --- Load Boss Chips for floating selector ---
 async function loadBossChips() {
   const container = document.getElementById("boss-chips");
   container.innerHTML = "";
@@ -106,36 +72,30 @@ async function loadBossChips() {
 
     chip.addEventListener("click", () => {
       selectedBossId = docSnap.id;
-      document.getElementById("open-boss-chips").textContent = docSnap.data().name; // show selected boss
-      container.classList.add("hidden"); // hide floating chips after selection
+      document.getElementById("open-boss-chips").textContent = docSnap.data().name;
+      container.classList.add("hidden");
     });
 
     container.appendChild(chip);
   });
 }
 
-// Toggle boss chips visibility
+// Toggle boss chips
 document.getElementById("open-boss-chips").addEventListener("click", () => {
-  const container = document.getElementById("boss-chips");
-  container.classList.toggle("hidden");
+  document.getElementById("boss-chips").classList.toggle("hidden");
 });
 
 // --- Add Boss Participation ---
 document.getElementById("add-boss").addEventListener("click", async () => {
-  let bossName = null;
-
-  if (selectedBossId) {
-    const bossDoc = await getDoc(doc(collection(db,"bosses"), selectedBossId));
-    bossName = bossDoc.data().name;
-  }
-
-  if (!bossName) return alert("Select a boss");
+  if (!selectedBossId) return alert("Select a boss");
   if (selectedMemberIds.size === 0) return alert("Select participants");
+
+  const bossDoc = await getDoc(doc(collection(db,"bosses"), selectedBossId));
+  const bossName = bossDoc.data().name;
 
   const weekId = await ensureCurrentWeek();
   const weekRef = doc(collection(db, "weeks"), weekId);
 
-  // Add a unique timestamp to allow duplicate boss+members
   await updateDoc(weekRef, {
     bosses: arrayUnion({
       name: bossName,
@@ -147,9 +107,41 @@ document.getElementById("add-boss").addEventListener("click", async () => {
   selectedMemberIds.clear();
   selectedBossId = null;
   document.getElementById("open-boss-chips").textContent = "Select Boss";
+  document.getElementById("open-member-chips").textContent = "Select Members";
   loadMembers();
   loadBossChips();
   loadDashboard();
+});
+
+// --- Add Member ---
+document.getElementById("add-member").addEventListener("click", async () => {
+  const name = document.getElementById("member-name").value.trim();
+  if (!name) return alert("Enter a member name");
+
+  const snapshot = await getDocs(collection(db, "members"));
+  const exists = snapshot.docs.some(d => d.data().name.toLowerCase() === name.toLowerCase());
+  if (exists) return alert("Member already exists!");
+
+  const memberRef = doc(collection(db, "members"));
+  await setDoc(memberRef, { name, createdAt: new Date() });
+  document.getElementById("member-name").value = "";
+  loadMembers();
+});
+
+// --- Add Global Boss ---
+document.getElementById("add-global-boss").addEventListener("click", async () => {
+  const name = document.getElementById("boss-name-input").value.trim();
+  if (!name) return alert("Enter boss name");
+
+  const snapshot = await getDocs(collection(db,"bosses"));
+  const exists = snapshot.docs.some(d => d.data().name.toLowerCase() === name.toLowerCase());
+  if (exists) return alert("Boss already exists!");
+
+  const bossRef = doc(collection(db,"bosses"));
+  await setDoc(bossRef, { name, createdAt: new Date() });
+  document.getElementById("boss-name-input").value = "";
+  loadGlobalBosses();
+  loadBossChips();
 });
 
 // --- Update Total Earnings ---
@@ -163,7 +155,20 @@ document.getElementById("update-earnings").addEventListener("click", async () =>
   loadDashboard();
 });
 
-// --- Load Dashboard (with boss details) ---
+// --- Load Global Bosses ---
+async function loadGlobalBosses() {
+  const container = document.getElementById("boss-list-chips");
+  container.innerHTML = "";
+  const snapshot = await getDocs(collection(db, "bosses"));
+  snapshot.forEach(docSnap => {
+    const chip = document.createElement("div");
+    chip.textContent = docSnap.data().name;
+    chip.className = "px-3 py-1 rounded-full bg-purple-200 text-purple-800 cursor-pointer hover:scale-105 transition transform";
+    container.appendChild(chip);
+  });
+}
+
+// --- Dashboard ---
 async function loadDashboard() {
   const weekId = await ensureCurrentWeek();
   const weekRef = doc(collection(db,"weeks"), weekId);
@@ -174,21 +179,18 @@ async function loadDashboard() {
   const bosses = weekData.bosses || [];
   const totalEarnings = weekData.totalEarnings || 0;
 
-  // Count participation and track bosses
   const participationCount = {};
   bosses.forEach(b => b.participants.forEach(id => {
     if (!participationCount[id]) participationCount[id] = [];
     participationCount[id].push(b.name);
   }));
 
-  // Calculate earnings
   const totalParticipations = Object.values(participationCount).reduce((sum, arr) => sum + arr.length, 0) || 1;
   const earnings = {};
   for (const [id, bossArray] of Object.entries(participationCount)) {
     earnings[id] = Math.floor((bossArray.length / totalParticipations) * totalEarnings);
   }
 
-  // Render dashboard
   const dash = document.getElementById("dashboard-content");
   dash.innerHTML = "";
 
