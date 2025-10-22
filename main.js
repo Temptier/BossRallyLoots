@@ -1,275 +1,302 @@
-// ================= FIREBASE IMPORTS =================
-import {
-  initializeApp
-} from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+// =============================
+// Firebase Configuration
+// =============================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import {
   getFirestore,
   collection,
   doc,
-  getDoc,
-  getDocs,
   addDoc,
   setDoc,
+  getDocs,
+  getDoc,
   updateDoc,
-  deleteDoc
-} from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
+  deleteDoc,
+  query,
+  where,
+  onSnapshot,
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-// ================= FIREBASE CONFIG =================
 const firebaseConfig = {
   apiKey: "AIzaSyCi4ldLdVtWAUKb0wyyds2HnbNujjIHmWQ",
   authDomain: "guildrallyloots.firebaseapp.com",
   projectId: "guildrallyloots",
   storageBucket: "guildrallyloots.firebasestorage.app",
   messagingSenderId: "116266984921",
-  appId: "1:116266984921:web:90326a9fed2ee48f79a5c8"
+  appId: "1:116266984921:web:90326a9fed2ee48f79a5c8",
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ================= HELPERS =================
-function formatDateTime(timestamp) {
-  if (!timestamp) return "(No date)";
-  const date = new Date(timestamp);
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
+// =============================
+// Helper Functions
+// =============================
+function getWeekRange(date = new Date()) {
+  const monday = new Date(date);
+  monday.setDate(date.getDate() - date.getDay() + 1);
+  monday.setHours(0, 0, 0, 0);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  return { monday, sunday };
+}
+
+function formatDateTime(date) {
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
-function getSelectedWeek() {
-  return document.getElementById("week-selector").value;
-}
+// =============================
+// UI Elements
+// =============================
+const weekSelector = document.getElementById("week-selector");
+const dashboardContent = document.getElementById("dashboard-content");
+const bossParticipantsContent = document.getElementById("boss-participants-content");
+const bossListDiv = document.getElementById("boss-list");
+const memberListDiv = document.getElementById("member-list");
+const addParticipationBtn = document.getElementById("add-participation-btn");
+const deleteWeekBtn = document.getElementById("delete-week-btn");
+const newBossInput = document.getElementById("new-boss-name");
+const addBossBtn = document.getElementById("add-boss-btn");
+const newMemberInput = document.getElementById("new-member-name");
+const addMemberBtn = document.getElementById("add-member-btn");
+const weeklyEarningsInput = document.getElementById("weekly-earnings");
+const saveEarningsBtn = document.getElementById("save-earnings-btn");
 
-// ================= LOAD WEEKS =================
+let currentWeekId = null;
+
+// =============================
+// Week Functions
+// =============================
 async function loadWeeks() {
-  const weekSelector = document.getElementById("week-selector");
-  const querySnapshot = await getDocs(collection(db, "weeks"));
-  const weeks = [];
-
-  querySnapshot.forEach(docSnap => {
+  const weeksRef = collection(db, "weeks");
+  const snapshot = await getDocs(weeksRef);
+  weekSelector.innerHTML = "";
+  snapshot.forEach((docSnap) => {
     const data = docSnap.data();
-    const start = data.startDate ? formatDateTime(data.startDate) : "(no date)";
-    weeks.push({
-      id: docSnap.id,
-      label: start
-    });
+    const option = document.createElement("option");
+    option.value = docSnap.id;
+    option.textContent = `${new Date(data.start).toLocaleDateString()} - ${new Date(
+      data.end
+    ).toLocaleDateString()}`;
+    weekSelector.appendChild(option);
   });
 
-  weekSelector.innerHTML = weeks.map(w =>
-    `<option value="${w.id}">${w.label}</option>`
-  ).join("");
-
-  if (weeks.length > 0) {
-    weekSelector.value = weeks[weeks.length - 1].id;
-    await loadDashboard();
-    await loadBossParticipants();
-  }
-}
-
-// ================= DASHBOARD =================
-async function loadDashboard() {
-  const weekId = getSelectedWeek();
-  const weekRef = doc(collection(db, "weeks"), weekId);
-  const snap = await getDoc(weekRef);
-  const container = document.getElementById("dashboard-content");
-
-  if (!snap.exists()) {
-    container.innerHTML = "<p class='text-gray-500'>No data for this week.</p>";
-    return;
-  }
-
-  const weekData = snap.data();
-  const bosses = weekData.bosses || [];
-  const totalEarnings = weekData.totalEarnings || 0;
-
-  const memberSnapshot = await getDocs(collection(db, "members"));
-  const memberMap = {};
-  memberSnapshot.forEach(docSnap => {
-    memberMap[docSnap.id] = docSnap.data().name;
-  });
-
-  const counts = {};
-  bosses.forEach(boss => {
-    (boss.participants || []).forEach(id => {
-      counts[id] = (counts[id] || 0) + 1;
-    });
-  });
-
-  const totalParticipation = Object.values(counts).reduce((a, b) => a + b, 0);
-  const goldPerParticipation = totalParticipation > 0 ? totalEarnings / totalParticipation : 0;
-
-  container.innerHTML = Object.entries(counts).map(([id, count]) => {
-    const name = memberMap[id] || "(Unknown Member)";
-    const gold = (count * goldPerParticipation).toFixed(1);
-    return `
-      <div class="p-2 border-b flex justify-between">
-        <span>${name}</span>
-        <span>${count} runs (${gold} gold)</span>
-      </div>
-    `;
-  }).join("") || "<p class='text-gray-500'>No participation yet.</p>";
-}
-
-// ================= BOSS PARTICIPANTS =================
-async function loadBossParticipants() {
-  const weekId = getSelectedWeek();
-  const weekRef = doc(collection(db, "weeks"), weekId);
-  const snap = await getDoc(weekRef);
-  const container = document.getElementById("boss-participants-content");
-
-  if (!snap.exists()) {
-    container.innerHTML = "<p class='text-gray-500'>No bosses recorded this week.</p>";
-    return;
-  }
-
-  const weekData = snap.data();
-  const bosses = weekData.bosses || [];
-
-  const memberSnapshot = await getDocs(collection(db, "members"));
-  const memberMap = {};
-  memberSnapshot.forEach(docSnap => {
-    memberMap[docSnap.id] = docSnap.data().name;
-  });
-
-  container.innerHTML = bosses.map((boss, i) => {
-    const names = (boss.participants || []).map(id => memberMap[id] || "(Unknown)").join(", ");
-    const date = boss.timestamp ? formatDateTime(boss.timestamp) : "(no date)";
-    return `
-      <div class="p-2 border-b">
-        <div class="flex justify-between">
-          <span><strong>${boss.name}</strong> — ${date}</span>
-          <div>
-            <button class="text-blue-600 underline mr-2" onclick="editBossParticipants(${i})">Edit</button>
-            <button class="text-red-600 underline" onclick="deleteBossEntry(${i})">Delete</button>
-          </div>
-        </div>
-        <div class="text-sm text-gray-700">Participants: ${names}</div>
-      </div>
-    `;
-  }).join("") || "<p class='text-gray-500'>No boss entries yet.</p>";
-}
-
-// ================= ADD MEMBER =================
-async function addMember() {
-  const name = document.getElementById("new-member-name").value.trim();
-  if (!name) return alert("Enter a member name.");
-
-  const membersRef = collection(db, "members");
-  const snap = await getDocs(membersRef);
-  const existing = snap.docs.find(d => d.data().name.toLowerCase() === name.toLowerCase());
-  if (existing) return alert("Member already exists!");
-
-  await addDoc(membersRef, { name });
-  alert("✅ Member added!");
-  document.getElementById("new-member-name").value = "";
-  loadMembers();
-}
-
-// ================= ADD GLOBAL BOSS =================
-async function addGlobalBoss() {
-  const name = document.getElementById("new-boss-name").value.trim();
-  if (!name) return alert("Enter boss name.");
-
-  const bossesRef = collection(db, "bosses");
-  const snap = await getDocs(bossesRef);
-  const existing = snap.docs.find(d => d.data().name.toLowerCase() === name.toLowerCase());
-  if (existing) return alert("Boss already exists!");
-
-  await addDoc(bossesRef, { name });
-  alert("✅ Boss added!");
-  document.getElementById("new-boss-name").value = "";
-  loadBosses();
-}
-
-// ================= LOAD MEMBERS & BOSSES =================
-async function loadMembers() {
-  const memberList = document.getElementById("member-list");
-  const snap = await getDocs(collection(db, "members"));
-  memberList.innerHTML = snap.docs.map(docSnap => `
-    <label class="flex items-center space-x-2">
-      <input type="checkbox" value="${docSnap.id}" class="member-checkbox">
-      <span>${docSnap.data().name}</span>
-    </label>
-  `).join("");
-}
-
-async function loadBosses() {
-  const bossList = document.getElementById("boss-list");
-  const snap = await getDocs(collection(db, "bosses"));
-  bossList.innerHTML = snap.docs.map(docSnap => `
-    <label class="flex items-center space-x-2">
-      <input type="radio" name="selected-boss" value="${docSnap.data().name}">
-      <span>${docSnap.data().name}</span>
-    </label>
-  `).join("");
-}
-
-// ================= ADD BOSS PARTICIPATION =================
-async function addBossParticipation() {
-  const weekId = getSelectedWeek();
-  if (!weekId) return alert("Select a week first.");
-
-  const selectedBoss = document.querySelector('input[name="selected-boss"]:checked');
-  if (!selectedBoss) return alert("Select a boss.");
-  const bossName = selectedBoss.value;
-
-  const selectedMembers = [...document.querySelectorAll('.member-checkbox:checked')].map(el => el.value);
-  if (selectedMembers.length === 0) return alert("Select at least one member.");
-
-  const weekRef = doc(collection(db, "weeks"), weekId);
-  const weekSnap = await getDoc(weekRef);
-
-  const bossRecord = {
-    name: bossName,
-    participants: selectedMembers,
-    timestamp: Date.now()
-  };
-
-  if (weekSnap.exists()) {
-    const data = weekSnap.data();
-    const bosses = data.bosses || [];
-    bosses.push(bossRecord);
-    await updateDoc(weekRef, { bosses });
+  if (snapshot.empty) {
+    await createCurrentWeek();
   } else {
-    await setDoc(weekRef, { bosses: [bossRecord] });
-  }
-
-  alert("✅ Boss participation added!");
-  await loadDashboard();
-  await loadBossParticipants();
-}
-
-// ================= DELETE WEEK =================
-async function deleteSelectedWeek() {
-  const weekId = getSelectedWeek();
-  if (!weekId) return alert("No week selected.");
-  if (!confirm("Are you sure you want to delete this week?")) return;
-
-  const weekRef = doc(collection(db, "weeks"), weekId);
-  await deleteDoc(weekRef);
-
-  alert("✅ Week deleted!");
-  await loadWeeks();
-  loadDashboard();
-  loadBossParticipants();
-}
-
-// ================= INIT =================
-document.addEventListener("DOMContentLoaded", async () => {
-  await loadWeeks();
-  await loadMembers();
-  await loadBosses();
-
-  document.getElementById("week-selector").addEventListener("change", () => {
+    weekSelector.value = snapshot.docs[0].id;
+    currentWeekId = snapshot.docs[0].id;
     loadDashboard();
     loadBossParticipants();
+  }
+}
+
+async function createCurrentWeek() {
+  const { monday, sunday } = getWeekRange();
+  const weeksRef = collection(db, "weeks");
+  const newWeek = await addDoc(weeksRef, {
+    start: monday.toISOString(),
+    end: sunday.toISOString(),
+    totalEarnings: 0,
+  });
+  await loadWeeks();
+  weekSelector.value = newWeek.id;
+  currentWeekId = newWeek.id;
+}
+
+weekSelector.addEventListener("change", () => {
+  currentWeekId = weekSelector.value;
+  loadDashboard();
+  loadBossParticipants();
+  loadWeekEarnings();
+});
+
+deleteWeekBtn.addEventListener("click", async () => {
+  if (currentWeekId && confirm("Delete this week and all records?")) {
+    await deleteDoc(doc(db, "weeks", currentWeekId));
+    await loadWeeks();
+  }
+});
+
+// =============================
+// Weekly Earnings
+// =============================
+async function loadWeekEarnings() {
+  if (!currentWeekId) return;
+  const docSnap = await getDoc(doc(db, "weeks", currentWeekId));
+  if (docSnap.exists()) {
+    weeklyEarningsInput.value = docSnap.data().totalEarnings || 0;
+  }
+}
+
+saveEarningsBtn.addEventListener("click", async () => {
+  if (!currentWeekId) return;
+  const amount = parseFloat(weeklyEarningsInput.value) || 0;
+  await updateDoc(doc(db, "weeks", currentWeekId), { totalEarnings: amount });
+  loadDashboard();
+});
+
+// =============================
+// Bosses and Members
+// =============================
+async function loadBosses() {
+  bossListDiv.innerHTML = "";
+  const bossesRef = collection(db, "bosses");
+  const snapshot = await getDocs(bossesRef);
+  snapshot.forEach((docSnap) => {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <label class="flex items-center gap-2">
+        <input type="radio" name="selected-boss" value="${docSnap.id}" />
+        ${docSnap.data().name}
+      </label>`;
+    bossListDiv.appendChild(div);
+  });
+}
+
+async function loadMembers() {
+  memberListDiv.innerHTML = "";
+  const membersRef = collection(db, "members");
+  const snapshot = await getDocs(membersRef);
+  snapshot.forEach((docSnap) => {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <label class="flex items-center gap-2">
+        <input type="checkbox" name="selected-member" value="${docSnap.id}" />
+        ${docSnap.data().name}
+      </label>`;
+    memberListDiv.appendChild(div);
+  });
+}
+
+addBossBtn.addEventListener("click", async () => {
+  const name = newBossInput.value.trim();
+  if (!name) return;
+  const bossesRef = collection(db, "bosses");
+  const snapshot = await getDocs(query(bossesRef, where("name", "==", name)));
+  if (snapshot.empty) {
+    await addDoc(bossesRef, { name });
+    newBossInput.value = "";
+    loadBosses();
+  } else {
+    alert("Boss already exists!");
+  }
+});
+
+addMemberBtn.addEventListener("click", async () => {
+  const name = newMemberInput.value.trim();
+  if (!name) return;
+  const membersRef = collection(db, "members");
+  const snapshot = await getDocs(query(membersRef, where("name", "==", name)));
+  if (snapshot.empty) {
+    await addDoc(membersRef, { name });
+    newMemberInput.value = "";
+    loadMembers();
+  } else {
+    alert("Member already exists!");
+  }
+});
+
+// =============================
+// Add Participation
+// =============================
+addParticipationBtn.addEventListener("click", async () => {
+  if (!currentWeekId) return;
+
+  const selectedBoss = document.querySelector('input[name="selected-boss"]:checked');
+  if (!selectedBoss) return alert("Select a boss first.");
+
+  const selectedMembers = Array.from(
+    document.querySelectorAll('input[name="selected-member"]:checked')
+  ).map((m) => m.value);
+  if (selectedMembers.length === 0) return alert("Select at least one member.");
+
+  await addDoc(collection(db, "weeks", currentWeekId, "participations"), {
+    bossId: selectedBoss.value,
+    members: selectedMembers,
+    timestamp: new Date().toISOString(),
   });
 
-  document.getElementById("delete-week-btn").addEventListener("click", deleteSelectedWeek);
-  document.getElementById("add-member-btn").addEventListener("click", addMember);
-  document.getElementById("add-boss-btn").addEventListener("click", addGlobalBoss);
-  document.getElementById("add-participation-btn").addEventListener("click", addBossParticipation);
+  loadDashboard();
+  loadBossParticipants();
 });
+
+// =============================
+// Load Dashboard and Participants
+// =============================
+async function loadDashboard() {
+  if (!currentWeekId) return;
+  const weekDoc = await getDoc(doc(db, "weeks", currentWeekId));
+  const totalEarnings = weekDoc.exists() ? weekDoc.data().totalEarnings || 0 : 0;
+
+  const partRef = collection(db, "weeks", currentWeekId, "participations");
+  const snapshot = await getDocs(partRef);
+
+  const memberCount = {};
+  for (const docSnap of snapshot.docs) {
+    const data = docSnap.data();
+    data.members.forEach((m) => {
+      memberCount[m] = (memberCount[m] || 0) + 1;
+    });
+  }
+
+  const membersRef = collection(db, "members");
+  const membersSnapshot = await getDocs(membersRef);
+  const memberMap = {};
+  membersSnapshot.forEach((m) => (memberMap[m.id] = m.data().name));
+
+  const totalParticipations = Object.values(memberCount).reduce((a, b) => a + b, 0);
+  dashboardContent.innerHTML = Object.entries(memberCount)
+    .map(([id, count]) => {
+      const share = totalParticipations ? ((count / totalParticipations) * totalEarnings).toFixed(2) : "0";
+      return `<div class="flex justify-between border-b py-1">
+        <span>${memberMap[id] || "Unknown"}</span>
+        <span>${count} runs (${share}g)</span>
+      </div>`;
+    })
+    .join("");
+}
+
+async function loadBossParticipants() {
+  if (!currentWeekId) return;
+  const partRef = collection(db, "weeks", currentWeekId, "participations");
+  const snapshot = await getDocs(partRef);
+
+  const bossesRef = collection(db, "bosses");
+  const bossesSnap = await getDocs(bossesRef);
+  const bossMap = {};
+  bossesSnap.forEach((b) => (bossMap[b.id] = b.data().name));
+
+  const membersRef = collection(db, "members");
+  const membersSnap = await getDocs(membersRef);
+  const memberMap = {};
+  membersSnap.forEach((m) => (memberMap[m.id] = m.data().name));
+
+  bossParticipantsContent.innerHTML = snapshot.docs
+    .map((docSnap) => {
+      const data = docSnap.data();
+      const bossName = bossMap[data.bossId] || "Unknown Boss";
+      const time = formatDateTime(new Date(data.timestamp));
+      const names = data.members.map((id) => memberMap[id] || "Unknown").join(", ");
+      return `<div class="border-b py-1 flex justify-between">
+        <span>${bossName} - ${time}</span>
+        <span>${names}</span>
+      </div>`;
+    })
+    .join("");
+}
+
+// =============================
+// Initialize
+// =============================
+loadWeeks();
+loadBosses();
+loadMembers();
