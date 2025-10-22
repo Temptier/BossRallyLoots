@@ -5,28 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Guild Boss Tracker</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    /* Overlay pointer fix */
-    #overlay {
-      pointer-events: none; /* default: ignore clicks */
-    }
-    #overlay.visible {
-      pointer-events: auto; /* only capture clicks when visible */
-    }
-  </style>
 </head>
 <body class="bg-gray-50 p-4">
-
-  <!-- Overlay for mobile slide-up panels -->
-  <div id="overlay" class="fixed inset-0 bg-black bg-opacity-30 z-40 hidden"></div>
 
   <!-- Add Boss Participation Panel -->
   <div id="boss-panel" class="mb-6 p-4 bg-white rounded shadow w-full sm:w-3/4 mx-auto">
     <h2 class="text-xl font-semibold mb-2 text-green-600">Add Boss Participation</h2>
 
-    <button id="open-boss-chips" class="z-50 w-full p-2 border rounded mb-2 text-left bg-gray-100">Select Boss</button>
-    <button id="open-member-chips" class="z-50 w-full p-2 border rounded mb-2 text-left bg-gray-100">Select Members</button>
+    <!-- Select Boss Button -->
+    <button id="open-boss-chips" class="w-full p-2 border rounded mb-2 text-left bg-gray-100">
+      Select Boss
+    </button>
+    <div id="boss-chips" class="flex flex-wrap gap-2 overflow-x-auto p-1 mb-2 hidden"></div>
 
+    <!-- Select Members Button -->
+    <button id="open-member-chips" class="w-full p-2 border rounded mb-2 text-left bg-gray-100">
+      Select Members
+    </button>
+    <div id="member-chips" class="flex flex-wrap gap-2 overflow-x-auto p-1 mb-2 hidden"></div>
+
+    <!-- Add Boss Participation Button -->
     <button id="add-boss" class="bg-green-500 text-white px-3 py-2 rounded w-full sm:w-auto">Add Boss Participation</button>
   </div>
 
@@ -34,6 +32,7 @@
   <div class="mb-6 p-4 bg-white rounded shadow w-full sm:w-3/4 mx-auto">
     <h2 class="text-xl font-semibold mb-2 text-yellow-600">Update Weekly Earnings</h2>
 
+    <!-- Week Selector -->
     <select id="week-selector" class="border p-2 rounded mb-2 w-full"></select>
 
     <input type="number" id="total-earnings" placeholder="Enter total gold earned" class="border p-2 rounded mb-2 w-full">
@@ -66,14 +65,7 @@
     <button id="delete-week" class="bg-red-500 text-white px-3 py-2 rounded w-full sm:w-auto">Delete Current Week</button>
   </div>
 
-  <!-- Floating Panels for Boss and Member Selection -->
-  <div id="boss-chips-panel" class="fixed bottom-0 left-0 w-full max-h-64 bg-white shadow-lg p-4 overflow-y-auto transform translate-y-full transition-transform duration-300 z-50">
-    <div id="boss-chips" class="flex flex-wrap gap-2"></div>
-  </div>
-  <div id="member-chips-panel" class="fixed bottom-0 left-0 w-full max-h-64 bg-white shadow-lg p-4 overflow-y-auto transform translate-y-full transition-transform duration-300 z-50">
-    <div id="member-chips" class="flex flex-wrap gap-2"></div>
-  </div>
-
   <script type="module" src="main.js"></script>
+
 </body>
 </html>
