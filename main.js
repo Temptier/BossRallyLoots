@@ -63,7 +63,8 @@ const newBossInput = document.getElementById("new-boss-name");
 const addBossBtn = document.getElementById("add-boss-btn");
 const newMemberInput = document.getElementById("new-member-name");
 const addMemberBtn = document.getElementById("add-member-btn");
-const weeklyEarningsInput = document.getElementById("weekly-earnings");
+const weeklyEarningsDiamondInput = document.getElementById("weekly-earnings-diamond");
+const weeklyEarningsCashInput = document.getElementById("weekly-earnings-cash");
 const saveEarningsBtn = document.getElementById("save-earnings-btn");
 const deselectAllBtn = document.getElementById("deselect-all-btn");
 
@@ -120,7 +121,7 @@ async function createCurrentWeek() {
   const newWeek = await addDoc(weeksRef, {
     start: monday.toISOString(),
     end: sunday.toISOString(),
-    totalEarnings: 0,
+    totalEarnings: { diamond: 0, cash: 0 },
   });
   await loadWeeks();
   return newWeek.id;
@@ -141,20 +142,27 @@ deleteWeekBtn.addEventListener("click", async () => {
 });
 
 // =============================
-// Weekly Earnings
+// Weekly Earnings (Dual Currency)
 // =============================
 async function loadWeekEarnings() {
   if (!currentWeekId) return;
   const docSnap = await getDoc(doc(db, "weeks", currentWeekId));
   if (docSnap.exists()) {
-    weeklyEarningsInput.value = docSnap.data().totalEarnings || 0;
+    const data = docSnap.data().totalEarnings || { diamond: 0, cash: 0 };
+    weeklyEarningsDiamondInput.value = data.diamond || 0;
+    weeklyEarningsCashInput.value = data.cash || 0;
   }
 }
 
 saveEarningsBtn.addEventListener("click", async () => {
   if (!currentWeekId) return;
-  const amount = parseFloat(weeklyEarningsInput.value) || 0;
-  await updateDoc(doc(db, "weeks", currentWeekId), { totalEarnings: amount });
+  const diamond = parseFloat(weeklyEarningsDiamondInput.value) || 0;
+  const cash = parseFloat(weeklyEarningsCashInput.value) || 0;
+
+  await updateDoc(doc(db, "weeks", currentWeekId), {
+    totalEarnings: { diamond, cash },
+  });
+
   loadDashboard();
 });
 
@@ -222,11 +230,11 @@ addMemberBtn.addEventListener("click", async () => {
   } else alert("Member already exists!");
 });
 
-// Deselect all members
 deselectAllBtn.addEventListener("click", () => {
   const checkboxes = memberListDiv.querySelectorAll('input[type="checkbox"]');
   checkboxes.forEach((c) => (c.checked = false));
 });
+
 // =============================
 // Add Participation
 // =============================
@@ -259,7 +267,9 @@ async function loadDashboard() {
   if (!currentWeekId) return;
 
   const weekDoc = await getDoc(doc(db, "weeks", currentWeekId));
-  const totalEarnings = weekDoc.exists() ? weekDoc.data().totalEarnings || 0 : 0;
+  const totalEarnings = weekDoc.exists()
+    ? weekDoc.data().totalEarnings || { diamond: 0, cash: 0 }
+    : { diamond: 0, cash: 0 };
 
   const partRef = collection(db, "weeks", currentWeekId, "participations");
   const snapshot = await getDocs(partRef);
@@ -280,10 +290,16 @@ async function loadDashboard() {
   const totalParticipations = Object.values(memberCount).reduce((a, b) => a + b, 0);
   dashboardContent.innerHTML = Object.entries(memberCount)
     .map(([id, count]) => {
-      const share = totalParticipations ? ((count / totalParticipations) * totalEarnings).toFixed(2) : "0";
+      const shareDiamond = totalParticipations
+        ? ((count / totalParticipations) * totalEarnings.diamond).toFixed(2)
+        : "0";
+      const shareCash = totalParticipations
+        ? ((count / totalParticipations) * totalEarnings.cash).toFixed(2)
+        : "0";
+
       return `<div class="flex justify-between border-b py-1">
         <span>${memberMap[id] || "Unknown"}</span>
-        <span>${count} runs (${share}g)</span>
+        <span>${count} runs (${shareDiamond}💎 / ${shareCash}$)</span>
       </div>`;
     })
     .join("");
@@ -294,6 +310,7 @@ async function loadDashboard() {
 // =============================
 async function loadBossParticipants() {
   if (!currentWeekId) return;
+
   const partRef = collection(db, "weeks", currentWeekId, "participations");
   const snapshot = await getDocs(partRef);
 
@@ -307,6 +324,7 @@ async function loadBossParticipants() {
   const memberMap = {};
   membersSnap.forEach((m) => (memberMap[m.id] = m.data().name));
 
+  // Clear previous content
   bossParticipantsContent.innerHTML = "";
 
   for (const docSnap of snapshot.docs) {
