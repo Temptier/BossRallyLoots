@@ -18,7 +18,7 @@
   <ul id="member-list" class="mt-2"></ul>
 </div>
 
-<!-- Boss Input -->
+<!-- Boss Panel -->
 <div id="boss-panel" class="mb-6 p-4 bg-white rounded shadow">
   <h2 class="text-xl font-semibold mb-2">Add Boss Participation</h2>
   <input type="text" id="boss-name" placeholder="Boss Name" class="border p-1 rounded mb-2">
@@ -26,11 +26,21 @@
   <button id="add-boss" class="bg-green-500 text-white px-3 py-1 rounded">Add Boss</button>
 </div>
 
+<!-- Total Earnings -->
+<div id="earnings-panel" class="mb-6 p-4 bg-white rounded shadow">
+  <h2 class="text-xl font-semibold mb-2">Total Weekly Earnings</h2>
+  <input type="number" id="total-earnings" placeholder="Enter Total Earnings" class="border p-1 rounded">
+  <button id="update-earnings" class="bg-yellow-500 text-white px-3 py-1 rounded">Update Earnings</button>
+</div>
+
 <!-- Dashboard -->
 <div id="dashboard" class="p-4 bg-white rounded shadow">
   <h2 class="text-xl font-semibold mb-2">Dashboard</h2>
   <div id="dashboard-content"></div>
 </div>
+
+<!-- Delete Week -->
+<button id="delete-week" class="bg-red-500 text-white px-3 py-1 rounded mt-4">Delete Current Week</button>
 
 <script type="module" src="firebase.js"></script>
 <script type="module" src="main.js"></script>
