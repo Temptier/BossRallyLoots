@@ -289,20 +289,20 @@ async function loadDashboard() {
 
   const totalParticipations = Object.values(memberCount).reduce((a, b) => a + b, 0);
   dashboardContent.innerHTML = Object.entries(memberCount)
-    .map(([id, count]) => {
-      const shareDiamond = totalParticipations
-        ? ((count / totalParticipations) * totalEarnings.diamond).toFixed(2)
-        : "0";
-      const shareCash = totalParticipations
-        ? ((count / totalParticipations) * totalEarnings.cash).toFixed(2)
-        : "0";
+  .map(([id, count]) => {
+    const shareDiamond = totalParticipations
+      ? ((count / totalParticipations) * totalEarnings.diamond).toFixed(2)
+      : "0";
+    const sharePeso = totalParticipations
+      ? ((count / totalParticipations) * totalEarnings.cash).toFixed(2)
+      : "0";
 
-      return `<div class="flex justify-between border-b py-1">
-        <span>${memberMap[id] || "Unknown"}</span>
-        <span>${count} runs (${shareDiamond}💎 / ${shareCash}$)</span>
-      </div>`;
-    })
-    .join("");
+    return `<div class="flex justify-between border-b py-1">
+      <span>${memberMap[id] || "Unknown"}</span>
+      <span>${count} runs (${shareDiamond}💎 / ₱${sharePeso})</span>
+    </div>`;
+  })
+  .join("");
 }
 
 // =============================
