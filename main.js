@@ -152,24 +152,45 @@ async function calculateEarnings(weekData) {
   for (const [id,count] of Object.entries(participationCount)) earnings[id] = Math.floor((count/totalParticipations)*totalEarnings);
   return earnings;
 }
-
-// --- Load Dashboard ---
+// --- Load Dashboard (with boss details) ---
 async function loadDashboard() {
   const weekId = await ensureCurrentWeek();
   const weekRef = doc(collection(db,"weeks"), weekId);
   const snap = await getDoc(weekRef);
   if (!snap.exists()) return;
-  const weekData = snap.data();
-  const earnings = await calculateEarnings(weekData);
 
+  const weekData = snap.data();
+  const bosses = weekData.bosses || [];
+  const totalEarnings = weekData.totalEarnings || 0;
+
+  // Count participation
+  const participationCount = {};
+  bosses.forEach(b => b.participants.forEach(id => {
+    if (!participationCount[id]) participationCount[id] = [];
+    participationCount[id].push(b.name); // track boss names
+  }));
+
+  // Calculate earnings
+  const totalParticipations = Object.values(participationCount).reduce((sum, arr) => sum + arr.length, 0) || 1;
+  const earnings = {};
+  for (const [id, bossArray] of Object.entries(participationCount)) {
+    earnings[id] = Math.floor((bossArray.length / totalParticipations) * totalEarnings);
+  }
+
+  // Render dashboard
   const dash = document.getElementById("dashboard-content");
   dash.innerHTML = "";
-  for (const [memberId, earning] of Object.entries(earnings)) {
+
+  for (const [memberId, bossArray] of Object.entries(participationCount)) {
     const memberDoc = await getDoc(doc(collection(db,"members"), memberId));
     const name = memberDoc.exists() ? memberDoc.data().name : "Unknown";
-    const participations = weekData.bosses.filter(b => b.participants.includes(memberId)).length;
+    const participations = bossArray.length;
+    const bossesJoined = bossArray.join(", "); // show boss names
+
     const div = document.createElement("div");
-    div.textContent = `${name} – Participations: ${participations} – Earnings: ${earning} gold`;
+    div.className = "p-2 bg-gray-100 rounded shadow mb-1";
+    div.textContent = `${name} – Participations: ${participations} – Bosses: ${bossesJoined} – Earnings: ${earnings[memberId]} gold`;
+
     dash.appendChild(div);
   }
 }
