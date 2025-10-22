@@ -68,7 +68,7 @@ document.getElementById("add-member").addEventListener("click", async () => {
   loadMembers();
 });
 
-// --- Load Bosses as Chips ---
+// --- Load Global Bosses ---
 async function loadBosses() {
   const container = document.getElementById("boss-chips");
   container.innerHTML = "";
@@ -89,21 +89,42 @@ async function loadBosses() {
   });
 }
 
+// --- Add Boss to Global List ---
+document.getElementById("add-global-boss").addEventListener("click", async () => {
+  const name = document.getElementById("boss-name-input").value.trim();
+  if (!name) return alert("Enter boss name");
+
+  const snapshot = await getDocs(collection(db,"bosses"));
+  const exists = snapshot.docs.some(d => d.data().name.toLowerCase() === name.toLowerCase());
+  if (exists) return alert("Boss already exists!");
+
+  const bossRef = doc(collection(db,"bosses"));
+  await setDoc(bossRef, { name, createdAt: new Date() });
+  document.getElementById("boss-name-input").value = "";
+  loadBosses();
+});
+
 // --- Add Boss Participation ---
 document.getElementById("add-boss").addEventListener("click", async () => {
-  if (!selectedBossId) return alert("Select a boss");
+  let bossName = document.getElementById("boss-name-inline").value.trim();
+
+  // Use chip selection if no inline input
+  if (!bossName && selectedBossId) {
+    const bossDoc = await getDoc(doc(collection(db,"bosses"), selectedBossId));
+    bossName = bossDoc.data().name;
+  }
+
+  if (!bossName) return alert("Enter or select a boss");
   if (selectedMemberIds.size === 0) return alert("Select participants");
 
   const weekId = await ensureCurrentWeek();
   const weekRef = doc(collection(db, "weeks"), weekId);
 
-  const bossDoc = await getDoc(doc(collection(db,"bosses"), selectedBossId));
-  const bossName = bossDoc.data().name;
-
   await updateDoc(weekRef, { bosses: arrayUnion({ name: bossName, participants: Array.from(selectedMemberIds) }) });
 
   selectedMemberIds.clear();
   selectedBossId = null;
+  document.getElementById("boss-name-inline").value = "";
   loadMembers();
   loadBosses();
   loadDashboard();
@@ -114,7 +135,7 @@ document.getElementById("update-earnings").addEventListener("click", async () =>
   const earnings = Number(document.getElementById("total-earnings").value);
   if (isNaN(earnings)) return alert("Enter valid number");
   const weekId = await ensureCurrentWeek();
-  const weekRef = doc(collection(db, "weeks"), weekId);
+  const weekRef = doc(collection(db,"weeks"), weekId);
   await updateDoc(weekRef, { totalEarnings: earnings });
   loadDashboard();
 });
