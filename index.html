@@ -15,12 +15,13 @@
     <button id="delete-week-btn" class="bg-red-500 text-white px-2 py-1 rounded text-sm">Delete Week</button>
   </div>
 
-  <!-- Weekly Earnings -->
-  <div class="mb-4 flex items-center gap-2">
-    <label for="weekly-earnings" class="font-semibold">Total Weekly Earnings:</label>
-    <input type="number" id="weekly-earnings" class="border p-1 rounded w-24"/>
-    <button id="save-earnings-btn" class="bg-blue-600 text-white px-2 py-1 rounded text-sm">Save</button>
-  </div>
+ <!-- Weekly Earnings -->
+<div class="mb-4 flex flex-col md:flex-row items-start md:items-center gap-2">
+  <label class="font-semibold">Weekly Earnings:</label>
+  <input type="number" id="weekly-earnings-diamond" placeholder="Diamonds" class="border p-1 rounded w-24"/>
+  <input type="number" id="weekly-earnings-cash" placeholder="Cash" class="border p-1 rounded w-24"/>
+  <button id="save-earnings-btn" class="bg-blue-600 text-white px-2 py-1 rounded text-sm">Save</button>
+</div>
 
   <!-- Panels Container -->
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
