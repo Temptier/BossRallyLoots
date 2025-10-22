@@ -3,102 +3,73 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Guild Rally Loots Tracker</title>
-  <link rel="icon" href="/static/favicon.ico" />
+  <title>Guild Loot Tracker</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module" src="main.js"></script>
 </head>
-<body class="bg-gray-100 text-gray-800 min-h-screen">
+<body class="bg-gray-100 min-h-screen">
+  <div class="max-w-2xl mx-auto p-4 space-y-6">
+    <h1 class="text-2xl font-bold text-center">Guild Boss Participation Tracker</h1>
 
-  <div class="container mx-auto p-4">
-    <h1 class="text-2xl font-bold mb-4 text-center text-yellow-700">Guild Rally Loots Tracker</h1>
+    <!-- Week Selection -->
+    <div>
+      <label class="block font-semibold mb-1">Select Week</label>
+      <select id="week-selector" class="w-full border rounded p-2"></select>
+    </div>
 
-    <!-- Week + Earnings Section -->
-    <div class="mb-6 p-4 bg-white rounded shadow w-full sm:w-3/4 mx-auto">
-      <h2 class="text-xl font-semibold mb-2 text-yellow-600">Weekly Earnings</h2>
-
-      <!-- Select Week -->
-      <label class="block mb-1 text-sm text-gray-600">Select Week</label>
-      <select id="week-selector" class="border p-2 rounded mb-3 w-full"></select>
-
-      <!-- Update Earnings -->
-      <input id="total-earnings" type="number" placeholder="Enter total gold earned"
-             class="border p-2 rounded mb-2 w-full" />
-      <button id="update-earnings"
-              class="bg-yellow-500 text-white px-3 py-2 rounded w-full sm:w-auto hover:bg-yellow-600">
-        Update Earnings
+    <!-- Total Earnings Input -->
+    <div>
+      <label class="block font-semibold mb-1">Total Weekly Earnings</label>
+      <input id="total-earnings" type="number" placeholder="Enter total gold"
+        class="border rounded w-full p-2 mb-2" />
+      <button id="save-earnings" class="bg-blue-600 text-white px-4 py-2 rounded w-full">
+        Save Weekly Earnings
       </button>
     </div>
 
     <!-- Add Boss Participation -->
-    <div class="p-4 bg-white rounded shadow w-full sm:w-3/4 mx-auto mb-6">
-      <h2 class="text-xl font-semibold mb-3 text-yellow-600">Add Boss Participation</h2>
-
-      <div class="flex flex-col sm:flex-row gap-2 mb-2">
-        <button id="open-boss-chips" class="border rounded px-3 py-2 bg-gray-50 flex-1 text-left">Select Boss</button>
-        <button id="open-member-chips" class="border rounded px-3 py-2 bg-gray-50 flex-1 text-left">Select Members</button>
-      </div>
-
-      <button id="add-boss"
-              class="bg-green-500 text-white px-3 py-2 rounded w-full sm:w-auto hover:bg-green-600">
+    <div class="border rounded p-3 bg-white shadow-sm">
+      <h2 class="font-bold mb-2">Add Boss Participation</h2>
+      <button id="select-boss" class="w-full border rounded p-2 mb-2">Select Boss</button>
+      <button id="select-members" class="w-full border rounded p-2 mb-2">Select Members</button>
+      <button id="add-participation" class="bg-green-600 text-white px-4 py-2 rounded w-full">
         Add Participation
       </button>
     </div>
 
-    <!-- Global Boss & Member List -->
-    <div class="grid sm:grid-cols-2 gap-4 w-full sm:w-3/4 mx-auto">
-      <!-- Global Boss -->
-      <div class="p-4 bg-white rounded shadow">
-        <h2 class="text-lg font-semibold mb-2 text-yellow-600">Add Global Boss</h2>
-        <input id="boss-name" type="text" placeholder="Enter boss name"
-               class="border p-2 rounded mb-2 w-full" />
-        <button id="add-boss-global"
-                class="bg-blue-500 text-white px-3 py-2 rounded w-full sm:w-auto hover:bg-blue-600">
-          Add Boss
-        </button>
-      </div>
+    <!-- Global Bosses -->
+    <div class="border rounded p-3 bg-white shadow-sm">
+      <h2 class="font-bold mb-2">Global Boss List</h2>
+      <input id="new-boss-name" type="text" placeholder="Add new boss"
+        class="border rounded w-full p-2 mb-2" />
+      <button id="add-global-boss" class="bg-blue-600 text-white px-4 py-2 rounded w-full">
+        Add Boss
+      </button>
+      <div id="global-bosses" class="mt-2"></div>
+    </div>
 
-      <!-- Add Member -->
-      <div class="p-4 bg-white rounded shadow">
-        <h2 class="text-lg font-semibold mb-2 text-yellow-600">Add Member</h2>
-        <input id="member-name" type="text" placeholder="Enter member name"
-               class="border p-2 rounded mb-2 w-full" />
-        <button id="add-member"
-                class="bg-purple-500 text-white px-3 py-2 rounded w-full sm:w-auto hover:bg-purple-600">
-          Add Member
-        </button>
-      </div>
+    <!-- Add Member -->
+    <div class="border rounded p-3 bg-white shadow-sm">
+      <h2 class="font-bold mb-2">Add Member</h2>
+      <input id="member-name" type="text" placeholder="Enter member name"
+        class="border rounded w-full p-2 mb-2" />
+      <button id="add-member" class="bg-blue-600 text-white px-4 py-2 rounded w-full">
+        Add Member
+      </button>
     </div>
 
     <!-- Dashboard -->
-    <div class="mt-6 p-4 bg-white rounded shadow w-full sm:w-3/4 mx-auto">
-      <h2 class="text-xl font-semibold mb-2 text-yellow-600">Dashboard</h2>
-      <div id="dashboard-content" class="text-sm"></div>
+    <div class="border rounded p-3 bg-white shadow-sm">
+      <h2 class="text-xl font-bold mb-2">Dashboard</h2>
+      <div id="dashboard-content"></div>
+    </div>
+
+    <!-- Boss Participants -->
+    <div class="border rounded p-3 bg-white shadow-sm">
+      <h2 class="text-xl font-bold mb-2">Boss Participants</h2>
+      <div id="boss-participants"></div>
     </div>
   </div>
-
-  <!-- Floating Boss List -->
-  <div id="boss-float"
-       class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-4 max-w-md w-full">
-      <h3 class="text-lg font-semibold mb-2 text-yellow-600">Select Boss</h3>
-      <div id="boss-chips" class="flex flex-wrap"></div>
-      <button class="mt-4 bg-gray-300 px-3 py-1 rounded w-full"
-              onclick="document.getElementById('boss-float').classList.add('hidden')">Close</button>
-    </div>
-  </div>
-
-  <!-- Floating Member List -->
-  <div id="member-float"
-       class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-4 max-w-md w-full">
-      <h3 class="text-lg font-semibold mb-2 text-yellow-600">Select Members</h3>
-      <div id="member-chips" class="flex flex-wrap"></div>
-      <button class="mt-4 bg-gray-300 px-3 py-1 rounded w-full"
-              onclick="document.getElementById('member-float').classList.add('hidden')">Close</button>
-    </div>
-  </div>
-
-  <!-- Main JS -->
-  <script type="module" src="./main.js"></script>
 </body>
 </html>
