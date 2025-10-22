@@ -94,7 +94,7 @@ document.getElementById("add-global-boss").addEventListener("click", async () =>
   loadGlobalBosses();
 });
 
-// --- Boss Chips for Weekly Participation ---
+// --- Boss Chips for Weekly Participation (Floating) ---
 async function loadBossChips() {
   const container = document.getElementById("boss-chips");
   container.innerHTML = "";
@@ -106,41 +106,47 @@ async function loadBossChips() {
 
     chip.addEventListener("click", () => {
       selectedBossId = docSnap.id;
-      Array.from(container.children).forEach(c => c.className = "px-3 py-1 rounded-full bg-gray-200 text-black cursor-pointer hover:scale-105 transition transform");
-      chip.className = "px-3 py-1 rounded-full bg-green-500 text-white cursor-pointer hover:scale-105 transition transform";
+      document.getElementById("open-boss-chips").textContent = docSnap.data().name; // show selected boss
+      container.classList.add("hidden"); // hide floating chips after selection
     });
 
     container.appendChild(chip);
   });
 }
 
-// --- Add Boss Participation (Fixed for multiple identical records) ---
-document.getElementById("add-boss").addEventListener("click", async () => {
-  let bossName = document.getElementById("boss-name-inline").value.trim();
+// Toggle boss chips visibility
+document.getElementById("open-boss-chips").addEventListener("click", () => {
+  const container = document.getElementById("boss-chips");
+  container.classList.toggle("hidden");
+});
 
-  if (!bossName && selectedBossId) {
+// --- Add Boss Participation ---
+document.getElementById("add-boss").addEventListener("click", async () => {
+  let bossName = null;
+
+  if (selectedBossId) {
     const bossDoc = await getDoc(doc(collection(db,"bosses"), selectedBossId));
     bossName = bossDoc.data().name;
   }
 
-  if (!bossName) return alert("Enter or select a boss");
+  if (!bossName) return alert("Select a boss");
   if (selectedMemberIds.size === 0) return alert("Select participants");
 
   const weekId = await ensureCurrentWeek();
   const weekRef = doc(collection(db, "weeks"), weekId);
 
-  // Add a unique timestamp to ensure Firestore saves duplicate boss+members
+  // Add a unique timestamp to allow duplicate boss+members
   await updateDoc(weekRef, {
     bosses: arrayUnion({
       name: bossName,
       participants: Array.from(selectedMemberIds),
-      createdAt: new Date() // <- ensures uniqueness
+      createdAt: new Date()
     })
   });
 
   selectedMemberIds.clear();
   selectedBossId = null;
-  document.getElementById("boss-name-inline").value = "";
+  document.getElementById("open-boss-chips").textContent = "Select Boss";
   loadMembers();
   loadBossChips();
   loadDashboard();
