@@ -28,9 +28,13 @@
     <button id="add-boss" class="bg-green-500 text-white px-3 py-2 rounded w-full sm:w-auto">Add Boss Participation</button>
   </div>
 
-  <!-- Update Total Earnings -->
+  <!-- Update Weekly Earnings -->
   <div class="mb-6 p-4 bg-white rounded shadow w-full sm:w-3/4 mx-auto">
     <h2 class="text-xl font-semibold mb-2 text-yellow-600">Update Weekly Earnings</h2>
+
+    <!-- Week Selector -->
+    <select id="week-selector" class="border p-2 rounded mb-2 w-full"></select>
+
     <input type="number" id="total-earnings" placeholder="Enter total gold earned" class="border p-2 rounded mb-2 w-full">
     <button id="update-earnings" class="bg-yellow-500 text-white px-3 py-2 rounded w-full sm:w-auto">Update Earnings</button>
   </div>
@@ -61,7 +65,6 @@
     <button id="delete-week" class="bg-red-500 text-white px-3 py-2 rounded w-full sm:w-auto">Delete Current Week</button>
   </div>
 
-  <!-- Main JS -->
   <script type="module" src="main.js"></script>
 
 </body>
