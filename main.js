@@ -14,7 +14,6 @@ import {
   deleteDoc,
   query,
   where,
-  onSnapshot,
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -79,6 +78,13 @@ async function loadWeeks() {
   const weeksRef = collection(db, "weeks");
   const snapshot = await getDocs(weeksRef);
   weekSelector.innerHTML = "";
+
+  const { monday, sunday } = getWeekRange();
+  const currentStart = monday.toISOString();
+  const currentEnd = sunday.toISOString();
+
+  let currentWeekFound = null;
+
   snapshot.forEach((docSnap) => {
     const data = docSnap.data();
     const option = document.createElement("option");
@@ -87,29 +93,45 @@ async function loadWeeks() {
       data.end
     ).toLocaleDateString()}`;
     weekSelector.appendChild(option);
+
+    // Detect current week
+    const start = new Date(data.start);
+    const end = new Date(data.end);
+    const now = new Date();
+    if (now >= start && now <= end) {
+      currentWeekFound = docSnap.id;
+    }
   });
 
   if (snapshot.empty) {
     await createCurrentWeek();
   } else {
-    weekSelector.value = snapshot.docs[0].id;
-    currentWeekId = snapshot.docs[0].id;
+    if (currentWeekFound) {
+      weekSelector.value = currentWeekFound;
+      currentWeekId = currentWeekFound;
+    } else {
+      // Auto-create if not found
+      const newWeek = await createCurrentWeek();
+      weekSelector.value = newWeek;
+      currentWeekId = newWeek;
+    }
     loadDashboard();
     loadBossParticipants();
+    loadWeekEarnings();
   }
 }
 
 async function createCurrentWeek() {
   const { monday, sunday } = getWeekRange();
   const weeksRef = collection(db, "weeks");
+
   const newWeek = await addDoc(weeksRef, {
     start: monday.toISOString(),
     end: sunday.toISOString(),
     totalEarnings: 0,
   });
   await loadWeeks();
-  weekSelector.value = newWeek.id;
-  currentWeekId = newWeek.id;
+  return newWeek.id;
 }
 
 weekSelector.addEventListener("change", () => {
@@ -186,9 +208,7 @@ addBossBtn.addEventListener("click", async () => {
     await addDoc(bossesRef, { name });
     newBossInput.value = "";
     loadBosses();
-  } else {
-    alert("Boss already exists!");
-  }
+  } else alert("Boss already exists!");
 });
 
 addMemberBtn.addEventListener("click", async () => {
@@ -200,9 +220,7 @@ addMemberBtn.addEventListener("click", async () => {
     await addDoc(membersRef, { name });
     newMemberInput.value = "";
     loadMembers();
-  } else {
-    alert("Member already exists!");
-  }
+  } else alert("Member already exists!");
 });
 
 // =============================
@@ -280,18 +298,75 @@ async function loadBossParticipants() {
   const memberMap = {};
   membersSnap.forEach((m) => (memberMap[m.id] = m.data().name));
 
-  bossParticipantsContent.innerHTML = snapshot.docs
-    .map((docSnap) => {
-      const data = docSnap.data();
-      const bossName = bossMap[data.bossId] || "Unknown Boss";
-      const time = formatDateTime(new Date(data.timestamp));
-      const names = data.members.map((id) => memberMap[id] || "Unknown").join(", ");
-      return `<div class="border-b py-1 flex justify-between">
-        <span>${bossName} - ${time}</span>
-        <span>${names}</span>
-      </div>`;
-    })
-    .join("");
+  bossParticipantsContent.innerHTML = "";
+
+  for (const docSnap of snapshot.docs) {
+    const data = docSnap.data();
+    const div = document.createElement("div");
+    div.className = "border-b py-2";
+
+    const bossName = bossMap[data.bossId] || "Unknown Boss";
+    const time = formatDateTime(new Date(data.timestamp));
+    const names = data.members.map((id) => memberMap[id] || "Unknown").join(", ");
+
+    div.innerHTML = `
+      <div class="flex justify-between items-center">
+        <div>
+          <span class="font-semibold">${bossName}</span> - ${time}<br>
+          <span class="text-sm text-gray-600">${names}</span>
+        </div>
+        <div class="flex gap-2">
+          <button class="edit-btn bg-yellow-400 text-white px-2 py-1 rounded text-xs">Edit</button>
+          <button class="delete-btn bg-red-500 text-white px-2 py-1 rounded text-xs">Delete</button>
+        </div>
+      </div>
+    `;
+
+    div.querySelector(".delete-btn").addEventListener("click", async () => {
+      if (confirm("Delete this participation?")) {
+        await deleteDoc(doc(db, "weeks", currentWeekId, "participations", docSnap.id));
+        loadDashboard();
+        loadBossParticipants();
+      }
+    });
+
+    div.querySelector(".edit-btn").addEventListener("click", async () => {
+      const editDiv = document.createElement("div");
+      editDiv.className = "mt-2 border-t pt-2";
+      editDiv.innerHTML = `<p class="font-semibold mb-1">Edit Participants:</p>`;
+
+      const checkList = membersSnap.docs
+        .map((m) => {
+          const checked = data.members.includes(m.id) ? "checked" : "";
+          return `
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" value="${m.id}" ${checked}>
+            ${m.data().name}
+          </label>`;
+        })
+        .join("");
+
+      editDiv.innerHTML += checkList;
+      const saveBtn = document.createElement("button");
+      saveBtn.textContent = "Save Changes";
+      saveBtn.className = "bg-blue-600 text-white px-2 py-1 rounded text-xs mt-2";
+      editDiv.appendChild(saveBtn);
+      div.appendChild(editDiv);
+
+      saveBtn.addEventListener("click", async () => {
+        const newMembers = Array.from(editDiv.querySelectorAll("input[type='checkbox']:checked")).map(
+          (i) => i.value
+        );
+        await updateDoc(doc(db, "weeks", currentWeekId, "participations", docSnap.id), {
+          members: newMembers,
+        });
+        loadDashboard();
+        loadBossParticipants();
+      });
+    });
+
+    bossParticipantsContent.appendChild(div);
+  }
 }
 
 // =============================
