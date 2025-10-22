@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guild Boss Tracker</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4">
+
+<h1 class="text-2xl font-bold mb-4">Guild Boss Hunt Tracker</h1>
+
+<!-- Member Panel -->
+<div id="member-panel" class="mb-6 p-4 bg-white rounded shadow">
+  <h2 class="text-xl font-semibold mb-2">Members</h2>
+  <input type="text" id="member-name" placeholder="Member Name" class="border p-1 rounded">
+  <button id="add-member" class="bg-blue-500 text-white px-3 py-1 rounded">Add</button>
+  <ul id="member-list" class="mt-2"></ul>
+</div>
+
+<!-- Boss Input -->
+<div id="boss-panel" class="mb-6 p-4 bg-white rounded shadow">
+  <h2 class="text-xl font-semibold mb-2">Add Boss Participation</h2>
+  <input type="text" id="boss-name" placeholder="Boss Name" class="border p-1 rounded mb-2">
+  <div id="member-checkboxes" class="mb-2"></div>
+  <button id="add-boss" class="bg-green-500 text-white px-3 py-1 rounded">Add Boss</button>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard" class="p-4 bg-white rounded shadow">
+  <h2 class="text-xl font-semibold mb-2">Dashboard</h2>
+  <div id="dashboard-content"></div>
+</div>
+
+<script type="module" src="firebase.js"></script>
+<script type="module" src="main.js"></script>
+</body>
+</html>
