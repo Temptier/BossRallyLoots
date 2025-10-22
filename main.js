@@ -3,7 +3,7 @@ import { db, collection, doc, setDoc, updateDoc, getDoc, getDocs, arrayUnion, de
 let selectedMemberIds = new Set();
 let selectedBossId = null;
 
-// --- Helper: Current week ---
+// --- Current Week ---
 const getCurrentWeekId = () => {
   const today = new Date();
   const monday = new Date(today);
@@ -30,15 +30,14 @@ async function ensureWeekExists(weekId) {
   }
 }
 
-// --- Load weeks into dropdown ---
+// --- Load Weeks ---
 async function loadWeeks() {
   const container = document.getElementById("week-selector");
   container.innerHTML = "";
 
   const snapshot = await getDocs(collection(db, "weeks"));
-  const weeks = snapshot.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .sort((a,b) => new Date(b.startDate) - new Date(a.startDate));
+  const weeks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+                             .sort((a,b) => new Date(b.startDate) - new Date(a.startDate));
 
   weeks.forEach(week => {
     const option = document.createElement("option");
@@ -63,13 +62,13 @@ async function loadWeeks() {
   }
 }
 
-// --- Get selected week ---
+// --- Selected Week ---
 function getSelectedWeek() {
   const selector = document.getElementById("week-selector");
   return selector.value || getCurrentWeekId();
 }
 
-// --- Load Members into floating chips ---
+// --- Load Members ---
 async function loadMembers() {
   const container = document.getElementById("member-chips");
   container.innerHTML = "";
@@ -88,7 +87,6 @@ async function loadMembers() {
         selectedMemberIds.add(docSnap.id);
         chip.className = "px-3 py-1 rounded-full bg-blue-500 text-white cursor-pointer hover:scale-105 transition transform";
       }
-
       const btn = document.getElementById("open-member-chips");
       btn.textContent = selectedMemberIds.size === 0 ? "Select Members" : `Selected: ${selectedMemberIds.size}`;
     });
@@ -110,20 +108,32 @@ async function loadBossChips() {
     chip.addEventListener("click", () => {
       selectedBossId = docSnap.id;
       document.getElementById("open-boss-chips").textContent = docSnap.data().name;
-      container.classList.add("hidden");
+      closePanels();
     });
 
     container.appendChild(chip);
   });
 }
 
-// --- Toggle chip lists ---
-document.getElementById("open-member-chips").addEventListener("click", () => {
-  document.getElementById("member-chips").classList.toggle("hidden");
-});
-document.getElementById("open-boss-chips").addEventListener("click", () => {
-  document.getElementById("boss-chips").classList.toggle("hidden");
-});
+// --- Panels & Overlay ---
+const bossPanel = document.getElementById("boss-chips-panel");
+const memberPanel = document.getElementById("member-chips-panel");
+const overlay = document.getElementById("overlay");
+
+function openPanel(panel) {
+  panel.classList.remove("translate-y-full");
+  overlay.classList.remove("hidden");
+}
+
+function closePanels() {
+  bossPanel.classList.add("translate-y-full");
+  memberPanel.classList.add("translate-y-full");
+  overlay.classList.add("hidden");
+}
+
+document.getElementById("open-boss-chips").addEventListener("click", () => openPanel(bossPanel));
+document.getElementById("open-member-chips").addEventListener("click", () => openPanel(memberPanel));
+overlay.addEventListener("click", closePanels);
 
 // --- Add Boss Participation ---
 document.getElementById("add-boss").addEventListener("click", async () => {
@@ -138,11 +148,7 @@ document.getElementById("add-boss").addEventListener("click", async () => {
 
   const weekRef = doc(collection(db, "weeks"), weekId);
   await updateDoc(weekRef, {
-    bosses: arrayUnion({
-      name: bossName,
-      participants: Array.from(selectedMemberIds),
-      createdAt: new Date()
-    })
+    bosses: arrayUnion({ name: bossName, participants: Array.from(selectedMemberIds), createdAt: new Date() })
   });
 
   selectedMemberIds.clear();
@@ -181,97 +187,4 @@ document.getElementById("add-global-boss").addEventListener("click", async () =>
   const bossRef = doc(collection(db,"bosses"));
   await setDoc(bossRef, { name, createdAt: new Date() });
   document.getElementById("boss-name-input").value = "";
-  loadGlobalBosses();
-  loadBossChips();
-});
-
-// --- Update Total Earnings ---
-document.getElementById("update-earnings").addEventListener("click", async () => {
-  const earnings = Number(document.getElementById("total-earnings").value);
-  if (isNaN(earnings)) return alert("Enter valid number");
-
-  const weekId = getSelectedWeek();
-  await ensureWeekExists(weekId);
-
-  const weekRef = doc(collection(db,"weeks"), weekId);
-  await updateDoc(weekRef, { totalEarnings: earnings });
-  loadDashboard();
-});
-
-// --- Load Global Bosses ---
-async function loadGlobalBosses() {
-  const container = document.getElementById("boss-list-chips");
-  container.innerHTML = "";
-  const snapshot = await getDocs(collection(db, "bosses"));
-  snapshot.forEach(docSnap => {
-    const chip = document.createElement("div");
-    chip.textContent = docSnap.data().name;
-    chip.className = "px-3 py-1 rounded-full bg-purple-200 text-purple-800 cursor-pointer hover:scale-105 transition transform";
-    container.appendChild(chip);
-  });
-}
-
-// --- Load Dashboard ---
-async function loadDashboard() {
-  const weekId = getSelectedWeek();
-  const weekRef = doc(collection(db,"weeks"), weekId);
-  const snap = await getDoc(weekRef);
-  const dash = document.getElementById("dashboard-content");
-  dash.innerHTML = "";
-
-  if (!snap.exists()) {
-    dash.innerHTML = "<p class='text-gray-500'>No data for this week.</p>";
-    return;
-  }
-
-  const weekData = snap.data();
-  const bosses = weekData.bosses || [];
-  const totalEarnings = weekData.totalEarnings || 0;
-
-  const participationCount = {};
-  for (const b of bosses) {
-    b.participants.forEach(id => {
-      if (!participationCount[id]) participationCount[id] = [];
-      participationCount[id].push(b.name);
-    });
-  }
-
-  const totalParticipations = Object.values(participationCount).reduce((sum, arr) => sum + arr.length, 0) || 1;
-  const earnings = {};
-  for (const [id, bossArray] of Object.entries(participationCount)) {
-    earnings[id] = Math.floor((bossArray.length / totalParticipations) * totalEarnings);
-  }
-
-  for (const [memberId, bossArray] of Object.entries(participationCount)) {
-    const memberDoc = await getDoc(doc(collection(db,"members"), memberId));
-    const name = memberDoc.exists() ? memberDoc.data().name : "Unknown";
-    const participations = bossArray.length;
-    const bossesJoined = bossArray.join(", ");
-
-    const div = document.createElement("div");
-    div.className = "p-2 bg-gray-100 rounded shadow mb-1";
-    div.textContent = `${name} – Participations: ${participations} – Bosses: ${bossesJoined} – Earnings: ${earnings[memberId]} gold`;
-    dash.appendChild(div);
-  }
-}
-
-// --- Delete Week ---
-document.getElementById("delete-week").addEventListener("click", async () => {
-  if (!confirm("Delete current week?")) return;
-  const weekId = getSelectedWeek();
-  await deleteDoc(doc(collection(db,"weeks"), weekId));
-  loadDashboard();
-  loadWeeks();
-});
-
-// --- Update dashboard when week changes ---
-document.getElementById("week-selector").addEventListener("change", () => {
-  loadDashboard();
-});
-
-// --- Initial Load ---
-await loadWeeks();
-loadMembers();
-loadGlobalBosses();
-loadBossChips();
-loadDashboard();
+  loadGlobal
