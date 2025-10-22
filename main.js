@@ -22,7 +22,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Utility functions
+// Utility
 function getWeekId(date = new Date()) {
   const monday = new Date(date);
   monday.setDate(date.getDate() - ((date.getDay() + 6) % 7));
@@ -34,19 +34,17 @@ function getSelectedWeek() {
   return document.getElementById("week-selector").value;
 }
 
-// --- Load Weeks ---
+// --- Load Week Options ---
 async function loadWeeks() {
   const weekSelector = document.getElementById("week-selector");
   const snapshot = await getDocs(collection(db, "weeks"));
   const weeks = [];
   snapshot.forEach(doc => weeks.push(doc.id));
-
   if (weeks.length === 0) {
     const defaultWeek = getWeekId();
     await setDoc(doc(collection(db, "weeks"), defaultWeek), { bosses: [], totalEarnings: 0 });
     weeks.push(defaultWeek);
   }
-
   weeks.sort().reverse();
   weekSelector.innerHTML = weeks.map(w => `<option value="${w}">${w}</option>`).join("");
 }
@@ -135,46 +133,15 @@ async function loadDashboard() {
       <h2 class="text-xl font-bold mt-6 mb-2">Boss Participants (This Week)</h2>
       <div>${bossDetailsHTML}</div>
     `;
+  } else {
+    container.innerHTML += `
+      <h2 class="text-xl font-bold mt-6 mb-2">Boss Participants (This Week)</h2>
+      <p class='text-gray-500'>No boss records this week.</p>
+    `;
   }
 }
 
-// --- Add Member ---
-document.getElementById("add-member-btn").addEventListener("click", async () => {
-  const name = document.getElementById("member-name").value.trim();
-  if (!name) return alert("Enter member name.");
-
-  const membersCol = collection(db, "members");
-  const snapshot = await getDocs(membersCol);
-  for (const docSnap of snapshot.docs) {
-    if (docSnap.data().name.toLowerCase() === name.toLowerCase()) {
-      alert("Member already exists!");
-      return;
-    }
-  }
-  await setDoc(doc(membersCol), { name });
-  alert("Member added!");
-  document.getElementById("member-name").value = "";
-});
-
-// --- Add Global Boss ---
-document.getElementById("add-boss-btn").addEventListener("click", async () => {
-  const name = document.getElementById("boss-name").value.trim();
-  if (!name) return alert("Enter boss name.");
-
-  const bossesCol = collection(db, "globalBosses");
-  const snapshot = await getDocs(bossesCol);
-  for (const docSnap of snapshot.docs) {
-    if (docSnap.data().name.toLowerCase() === name.toLowerCase()) {
-      alert("Boss already exists!");
-      return;
-    }
-  }
-  await setDoc(doc(bossesCol), { name });
-  alert("Boss added!");
-  document.getElementById("boss-name").value = "";
-});
-
-// --- Delete Boss Record ---
+// --- Delete a Boss Record ---
 window.deleteBossRecord = async function (index) {
   const weekId = getSelectedWeek();
   const weekRef = doc(collection(db, "weeks"), weekId);
@@ -240,6 +207,7 @@ window.editBossParticipants = async function (index) {
   document.body.appendChild(overlay);
 
   modal.querySelector("#cancelEdit").onclick = () => overlay.remove();
+
   modal.querySelector("#saveEdit").onclick = async () => {
     const selected = Array.from(modal.querySelectorAll("input:checked")).map(c => c.value);
     bosses[index].participants = selected;
@@ -251,74 +219,7 @@ window.editBossParticipants = async function (index) {
   };
 };
 
-// --- Add Boss Participation (Floating) ---
-document.getElementById("select-boss-btn").addEventListener("click", async () => {
-  const bossSnap = await getDocs(collection(db, "globalBosses"));
-  const bosses = [];
-  bossSnap.forEach(d => bosses.push({ id: d.id, name: d.data().name }));
-
-  const memberSnap = await getDocs(collection(db, "members"));
-  const members = [];
-  memberSnap.forEach(d => members.push({ id: d.id, name: d.data().name }));
-
-  const overlay = document.createElement("div");
-  overlay.className = "fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50";
-
-  const modal = document.createElement("div");
-  modal.className = "bg-white rounded-2xl shadow-lg p-6 w-96 max-h-[90vh] overflow-y-auto";
-
-  modal.innerHTML = `
-    <h2 class="text-lg font-bold mb-3">Add Boss Participation</h2>
-    <label class="block font-semibold mb-1">Select Boss</label>
-    <select id="boss-select" class="border rounded p-2 w-full mb-3">
-      <option value="">-- Choose Boss --</option>
-      ${bosses.map(b => `<option value="${b.name}">${b.name}</option>`).join("")}
-    </select>
-
-    <label class="block font-semibold mb-1">Select Members</label>
-    <div class="space-y-1 mb-4">
-      ${members
-        .map(
-          m => `
-        <label class="flex items-center gap-2">
-          <input type="checkbox" value="${m.id}"> ${m.name}
-        </label>`
-        )
-        .join("")}
-    </div>
-
-    <div class="flex justify-end gap-2">
-      <button id="cancelAdd" class="px-3 py-1 bg-gray-400 text-white rounded">Cancel</button>
-      <button id="saveAdd" class="px-3 py-1 bg-green-600 text-white rounded">Save</button>
-    </div>
-  `;
-
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
-
-  modal.querySelector("#cancelAdd").onclick = () => overlay.remove();
-
-  modal.querySelector("#saveAdd").onclick = async () => {
-    const bossName = document.getElementById("boss-select").value;
-    const selectedMembers = Array.from(modal.querySelectorAll("input:checked")).map(c => c.value);
-    if (!bossName || selectedMembers.length === 0) return alert("Select a boss and at least one member!");
-
-    const weekId = getSelectedWeek();
-    const weekRef = doc(collection(db, "weeks"), weekId);
-    const weekSnap = await getDoc(weekRef);
-    if (!weekSnap.exists()) await setDoc(weekRef, { bosses: [], totalEarnings: 0 });
-
-    await updateDoc(weekRef, {
-      bosses: arrayUnion({ name: bossName, participants: selectedMembers, date: new Date() })
-    });
-
-    alert("Boss participation added!");
-    overlay.remove();
-    loadDashboard();
-  };
-});
-
-// --- Initialize ---
+// --- Initial Load ---
 await loadWeeks();
 document.getElementById("week-selector").addEventListener("change", loadDashboard);
 loadDashboard();
