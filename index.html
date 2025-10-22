@@ -1,57 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Guild Boss Tracker</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GuildRally Loot Tracker</title>
+  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 p-4">
+<body class="bg-gray-100 text-gray-800 min-h-screen">
+  <div class="max-w-4xl mx-auto p-4">
+    <h1 class="text-2xl font-bold text-center mb-6">Guild Rally Loot Tracker</h1>
 
-  <h1 class="text-2xl font-bold mb-4">Guild Boss Participation Tracker</h1>
-
-  <!-- Week Selector -->
-  <div class="mb-4">
-    <label class="font-semibold mr-2">Select Week:</label>
-    <select id="weekSelect" class="border px-2 py-1 rounded"></select>
-  </div>
-
-  <!-- Add Boss Participation -->
-  <div class="mb-4 p-4 bg-white rounded shadow">
-    <h2 class="font-semibold mb-2">Add Boss Participation</h2>
-
-    <!-- Select Boss -->
-    <div class="mb-2">
-      <label class="font-semibold mr-2">Select Boss:</label>
-      <select id="bossSelect" class="border px-2 py-1 rounded"></select>
-      <button id="addBossBtn" class="ml-2 bg-green-500 text-white px-2 py-1 rounded">Add Boss</button>
+    <!-- WEEK SELECTOR -->
+    <div class="mb-4">
+      <label class="block font-semibold mb-1">Select Week</label>
+      <div class="flex gap-2 mb-2">
+        <select id="week-selector" class="border rounded px-2 py-1 w-full"></select>
+        <button id="delete-week-btn" class="bg-red-500 text-white px-3 py-1 rounded">Delete</button>
+      </div>
+      <div class="flex gap-2">
+        <input id="weekly-earnings" type="number" placeholder="Enter total weekly earnings" class="border rounded px-2 py-1 w-full" />
+        <button id="save-earnings-btn" class="bg-yellow-500 text-white px-3 py-1 rounded">Save</button>
+      </div>
     </div>
 
-    <!-- Select Members -->
-    <div class="mb-2">
-      <label class="font-semibold mb-1 block">Select Members:</label>
-      <div id="memberList" class="max-h-48 overflow-y-auto border rounded p-2 bg-gray-50"></div>
-      <button id="addMemberBtn" class="mt-2 bg-green-500 text-white px-2 py-1 rounded">Add Member</button>
+    <!-- DASHBOARD -->
+    <div class="bg-white rounded-xl shadow p-4 mb-6">
+      <h2 class="text-lg font-semibold mb-2">Dashboard</h2>
+      <div id="dashboard-content" class="text-sm"></div>
     </div>
 
-    <!-- Add Participation Button -->
-    <button id="addParticipationBtn" class="mt-2 bg-blue-500 text-white px-3 py-1 rounded">Add Participation</button>
+    <!-- BOSS PARTICIPANTS -->
+    <div class="bg-white rounded-xl shadow p-4 mb-6">
+      <h2 class="text-lg font-semibold mb-2">Boss Participants</h2>
+      <div id="boss-participants-content" class="text-sm"></div>
+    </div>
+
+    <!-- ADD BOSS PARTICIPATION -->
+    <div class="bg-white rounded-xl shadow p-4 mb-6">
+      <h2 class="text-lg font-semibold mb-3">Add Boss Participation</h2>
+
+      <!-- SELECT BOSS -->
+      <div class="mb-3">
+        <label class="block font-semibold mb-1">Select Boss</label>
+        <div id="boss-list" class="bg-gray-50 border rounded p-2 max-h-40 overflow-y-auto"></div>
+      </div>
+
+      <!-- SELECT MEMBERS -->
+      <div class="mb-3">
+        <label class="block font-semibold mb-1">Select Members</label>
+        <div id="member-list" class="bg-gray-50 border rounded p-2 max-h-40 overflow-y-auto"></div>
+      </div>
+
+      <button id="add-participation-btn" class="bg-blue-600 text-white px-4 py-2 rounded w-full">Add Participation</button>
+    </div>
+
+    <!-- ADD GLOBAL BOSS -->
+    <div class="bg-white rounded-xl shadow p-4 mb-4">
+      <h2 class="text-lg font-semibold mb-2">Add Global Boss</h2>
+      <div class="flex gap-2">
+        <input id="new-boss-name" type="text" placeholder="Enter new boss name" class="border rounded px-2 py-1 w-full" />
+        <button id="add-boss-btn" class="bg-green-600 text-white px-3 py-1 rounded">Add</button>
+      </div>
+    </div>
+
+    <!-- ADD MEMBER -->
+    <div class="bg-white rounded-xl shadow p-4 mb-6">
+      <h2 class="text-lg font-semibold mb-2">Add Member</h2>
+      <div class="flex gap-2">
+        <input id="new-member-name" type="text" placeholder="Enter new member name" class="border rounded px-2 py-1 w-full" />
+        <button id="add-member-btn" class="bg-green-600 text-white px-3 py-1 rounded">Add</button>
+      </div>
+    </div>
+
+    <footer class="text-center text-xs text-gray-500 mt-6">
+      GuildRally Loot Tracker © 2025
+    </footer>
   </div>
 
-  <!-- Dashboard -->
-  <div class="mb-4 p-4 bg-white rounded shadow">
-    <h2 class="font-semibold mb-2">Dashboard Summary</h2>
-    <div id="dashboard" class="space-y-1"></div>
-  </div>
-
-  <!-- Boss Participants List -->
-  <div class="p-4 bg-white rounded shadow">
-    <h2 class="font-semibold mb-2">Boss Participants</h2>
-    <div id="participationList" class="space-y-2"></div>
-  </div>
-
-  <!-- Scripts -->
-  <script type="module" src="main.js"></script>
-
+  <script type="module" src="./main.js"></script>
 </body>
 </html>
