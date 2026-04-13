@@ -1,73 +1,117 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en.US">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Guild Boss Tracker</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8">
+    <span lang="en">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Multi-Server Timer Manager</title>
+    </span>
+    <link rel="stylesheet" href="style.css">
+</style>
 </head>
-<body class="bg-gray-100 p-4">
+<body>
+    <header>
+        <h1>⏱️ Timer Manager Pro</h1>
+        <div class="user-controls">
+            <button id="server-switcher">Server: None</button>
+            <button id="new-server-btn">New Server</button>
+            <button id="config-manager-btn">Config Manager</button>
+        </div>
+    </header>
 
-  <!-- Week Selector -->
-  <div class="mb-4 flex items-center gap-2">
-    <label for="week-selector" class="font-semibold">Select Week:</label>
-    <select id="week-selector" class="border p-1 rounded"></select>
-    <button id="delete-week-btn" class="bg-red-500 text-white px-2 py-1 rounded text-sm">Delete Week</button>
-  </div>
+    <main>
+        <!-- Server Selector & Dashboard -->
+        <section id="server-dashboard">
+            <h2>Active Server: <span id="current-server-name">None</span></h2>
+            <div class="server-tabs">
+                <!-- Tabs for different servers -->
+            </div>
+            
+            <!-- Timer List Area -->
+            <div id="timer-list-container">
+                <h3>Timers</h3>
+                <div id="timers-view">
+                    <!-- Timers will be rendered here -->
+                    <p class="placeholder">Select a server to view timers.</p>
+                </div>
+            </div>
+        </section>
 
- <!-- Weekly Earnings -->
-<div class="mb-4 flex flex-col md:flex-row items-start md:items-center gap-2">
-  <label class="font-semibold">Weekly Earnings:</label>
-  <input type="number" id="weekly-earnings-diamond" placeholder="Diamonds" class="border p-1 rounded w-24"/>
-  <input type="number" id="weekly-earnings-cash" placeholder="Cash" class="border p-1 rounded w-24"/>
-  <button id="save-earnings-btn" class="bg-blue-600 text-white px-2 py-1 rounded text-sm">Save</button>
-</div>
+        <!-- Modals -->
+        
+        <!-- Modal 1: Add/Edit Timer -->
+        <div id="timer-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-button">&times;</span>
+                <h2>Add/Edit Timer</h2>
+                <form id="timer-form">
+                    <label for="timer-name">Name:</label><br>
+                    <input type="text" id="timer-name" required><br><br>
+                    
+                    <label for="timer-type">Type:</label>
+                    <select id="timer-type">
+                        <option value="countdown">Countdown</option>
+                        <option value="schedule">Scheduled</option>
+                        <option value="repeat">Repeat</option>
+                    </select><br><br>
 
-  <!-- Panels Container -->
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <label for="timer-duration">Duration (s) or Schedule Time:</label>
+                    <input type="number" id="timer-duration" required><br><br>
 
-    <!-- Bosses Panel -->
-    <div id="bosses-panel" class="p-4 border rounded">
-      <h3 class="font-semibold mb-2">Select Boss</h3>
-      <div id="boss-list" class="flex flex-col gap-1 max-h-48 overflow-y-auto"></div>
-      <div class="mt-2 flex gap-2">
-        <input type="text" id="new-boss-name" placeholder="New boss name" class="border p-1 flex-1 rounded"/>
-        <button id="add-boss-btn" class="bg-green-600 text-white px-2 py-1 rounded text-sm">Add Boss</button>
-      </div>
-    </div>
+                    <label for="timer-group">Group:</label>
+                    <input type="text" id="timer-group"><br><br>
 
-    <!-- Members Panel -->
-    <div id="members-panel" class="p-4 border rounded">
-      <h3 class="font-semibold mb-2">Select Members</h3>
-      <button id="deselect-all-btn" class="bg-gray-500 text-white px-2 py-1 rounded text-xs mb-2">Deselect All</button>
-      <div id="member-list" class="flex flex-col gap-1 max-h-48 overflow-y-auto"></div>
-      <div class="mt-2 flex gap-2">
-        <input type="text" id="new-member-name" placeholder="New member name" class="border p-1 flex-1 rounded"/>
-        <button id="add-member-btn" class="bg-green-600 text-white px-2 py-1 rounded text-sm">Add Member</button>
-      </div>
-    </div>
+                    <label for="timer-server-id">Server ID:</label>
+                    <input type="text" id="timer-server-id" required><br><br>
 
-  </div>
+                    <label for="timer-status">Status:</label>
+                    <select id="timer-status">
+                        <option value="running">Running</option>
+                        <option value="paused">Paused</option>
+                        <option value="finished">Finished</option>
+                    </select><br><br>
 
-  <!-- Add Participation Button -->
-  <div class="mb-4">
-    <button id="add-participation-btn" class="bg-indigo-600 text-white px-4 py-2 rounded text-sm">Add Participation</button>
-  </div>
+                    <button type="submit">Save Timer</button>
+                </form>
+            </div>
+        </div>
 
-  <!-- Dashboard -->
-  <div class="mb-4">
-    <h3 class="font-semibold mb-2">Dashboard (Member Participation)</h3>
-    <div id="dashboard-content" class="p-2 border rounded bg-white"></div>
-  </div>
+        <!-- Modal 2: Server Settings (Storage/Firebase) -->
+        <div id="server-config-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-button">&times;</span>
+                <h2>Server Settings</h2>
+                <form id="server-config-form">
+                    <label for="server-storageType">Storage Mode:</label>
+                    <select id="server-storageType">
+                        <option value="local">Local Storage Mode</option>
+                        <option value="firebase">Firebase Mode</option>
+                    </select><br><br>
 
-  <!-- Boss Participants List -->
-  <div>
-    <h3 class="font-semibold mb-2">Boss Participants (Per Entry)</h3>
-    <div id="boss-participants-content" class="p-2 border rounded bg-white"></div>
-  </div>
+                    <div id="local-storage-options" class="config-options">
+                        <!-- Local options -->
+                        <label for="local-firebase-config-id">Firebase Config ID (Optional):</label>
+                        <input type="text" id="local-firebase-config-id"><br><br>
+                    </div>
 
-  <!-- Main JS -->
-  <script type="module" src="main.js"></script>
+                    <div id="firebase-storage-options" class="config-options" style="display: none;">
+                        <h3>Firebase Configuration</h3>
+                        <label for="firebase-config-name">Config Name:</label><br>
+                        <input type="text" id="firebase-config-name"><br><br>
+                        <!-- Add fields for API Key, Project ID, etc. -->
+                        <label for="firebase-config-api_key">API Key:</label><br>
+                        <label for="firebase-firebase_project_id">Project ID:</label><br>
+                        <button type="submit">Save Firebase Config</button>
+                    </div>
 
+                    
+                    <button type="submit">Save Server Settings</button>
+                </form>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="app.js"></script>
 </body>
 </html>
